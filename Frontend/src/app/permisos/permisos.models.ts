@@ -148,6 +148,7 @@ export interface SavePermisoHoraRequest {
   Fecha: string;
   HoraSalida: string;
   HoraEntrada: string;
+  FechaSolicitud: string;
 }
 
 export const PERMISO_TIPOS: { value: PermisoTipo; label: string }[] = [

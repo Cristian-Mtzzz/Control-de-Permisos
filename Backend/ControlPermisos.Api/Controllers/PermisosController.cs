@@ -254,18 +254,25 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     {
         if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo) is { } message) return message;
         if (permiso.FechaInicio == default || permiso.FechaFin == default) return "Indica la fecha inicial y la fecha final.";
-        if (permiso.FechaSolicitud == default) return "Indica la fecha en que se hizo la solicitud.";
-        // Puede ser posterior al permiso (se pide después de faltar), pero no una fecha que todavía no llega.
-        return permiso.FechaSolicitud.Date > DateTime.Today ? "La fecha de solicitud no puede ser posterior a hoy." : null;
+        return ValidateFechaSolicitud(permiso.FechaSolicitud);
     }
 
     private static string? ValidateHora(SavePermisoHoraDto permiso)
     {
         if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo) is { } message) return message;
         if (permiso.Fecha == default) return "Indica la fecha del permiso.";
-        return string.IsNullOrWhiteSpace(permiso.HoraSalida) || string.IsNullOrWhiteSpace(permiso.HoraEntrada)
-            ? "Indica la hora de salida y la hora de entrada."
-            : null;
+        if (string.IsNullOrWhiteSpace(permiso.HoraSalida) || string.IsNullOrWhiteSpace(permiso.HoraEntrada))
+        {
+            return "Indica la hora de salida y la hora de entrada.";
+        }
+        return ValidateFechaSolicitud(permiso.FechaSolicitud);
+    }
+
+    // Puede ser posterior al permiso (se pide después de faltar), pero no una fecha que todavía no llega.
+    private static string? ValidateFechaSolicitud(DateTime fechaSolicitud)
+    {
+        if (fechaSolicitud == default) return "Indica la fecha en que se hizo la solicitud.";
+        return fechaSolicitud.Date > DateTime.Today ? "La fecha de solicitud no puede ser posterior a hoy." : null;
     }
 
     private static string? ValidateCommon(int idEmpleado, string? motivo)

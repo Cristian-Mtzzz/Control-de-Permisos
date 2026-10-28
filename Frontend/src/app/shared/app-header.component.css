@@ -67,12 +67,6 @@
     object-fit: contain;
 }
 
-.brand-logo-placeholder {
-    border: 1px dashed #9ebeb5;
-    color: #276968;
-    background: #e8f2ee;
-}
-
 .brand-logo svg {
     width: 1.5rem;
     height: 1.5rem;

@@ -219,7 +219,7 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
         PermisoValores.TipoHora, permiso.IdEmpleado, permiso.Motivo.Trim(),
         permiso.Fecha.Date, permiso.Fecha.Date,
         ParseHora(permiso.HoraSalida, "salida"), ParseHora(permiso.HoraEntrada, "entrada"),
-        null);
+        permiso.FechaSolicitud.Date);
 
     // Alta (idPermiso null) o edición. Todo ocurre en una transacción con la tabla bloqueada,
     // para que dos registros simultáneos del mismo empleado no pasen ambos la revisión de choques.

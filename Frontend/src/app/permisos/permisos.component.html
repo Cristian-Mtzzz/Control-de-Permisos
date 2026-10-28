@@ -160,14 +160,14 @@
         <thead>
           <tr>
             <th>#</th>
-            <th>TIPO</th>
+            <th>TIPO DE PERMISO</th>
+            <th>FECHA DE SOLICITUD</th>
             <th>EMPLEADO</th>
             @if (muestraDepartamento) { <th>DEPARTAMENTO</th> }
             @if (veVarias) { <th>ÁREA</th> }
             <th>MOTIVO</th>
             <th>DESDE</th>
             <th>HASTA</th>
-            <th>FECHA DE SOLICITUD</th>
             <th>SALIDA</th>
             <th>ENTRADA</th>
             <th class="num">HORAS</th>
@@ -186,6 +186,7 @@
           <tr [class.permiso-anulado]="permiso.Estado === 'ANULADO'">
             <td>{{ permiso.IdPermiso }}</td>
             <td><span class="tipo-badge" [class.hora]="permiso.Tipo === 'HORA'">{{ tipoLabel(permiso.Tipo) }}</span></td>
+            <td>{{ formatDay(permiso.FechaSolicitud) }}</td>
             <td>
               <button type="button" class="empleado-link" (click)="openHistorial(permiso.IdEmpleado)"
                 title="Ver historial del empleado">{{ permiso.Empleado }}</button>
@@ -196,7 +197,6 @@
             <td class="motivo-cell">{{ permiso.Motivo }}</td>
             <td>{{ formatDay(permiso.FechaInicio) }}</td>
             <td>{{ formatDay(permiso.FechaFin) }}</td>
-            <td>{{ formatDay(permiso.FechaSolicitud) }}</td>
             <td>{{ display(permiso.HoraSalida) }}</td>
             <td>{{ display(permiso.HoraEntrada) }}</td>
             <td class="num">{{ formatMinutes(permiso.Minutos) }}</td>
@@ -206,20 +206,17 @@
                 [class.finalizado]="estado(permiso) === 'FINALIZADO'">{{ estado(permiso) }}</span>
             </td>
             <td class="row-actions">
-              @if (permiso.Estado === 'ACTIVO') {
-              @if (puedeModificar(permiso)) {
+              @if (estado(permiso) === 'ANULADO') {
+              <span class="closed">Anulado</span>
+              } @else if (estado(permiso) === 'FINALIZADO') {
+              <span class="closed">Finalizado</span>
+              } @else if (puedeModificar(permiso)) {
               <button type="button" class="secondary" (click)="openEditWindow(permiso)">Editar</button>
-              }
-              <button type="button" class="secondary" (click)="imprimir(permiso)">Constancia</button>
-              @if (puedeModificar(permiso)) {
               <button type="button" class="danger" (click)="openAnularWindow(permiso)">Anular</button>
               } @else if (!soloLectura) {
               <span class="closed" [title]="'Lo modifica quien administra ' + (permiso.NombreArea ? 'el área ' + permiso.NombreArea : 'ese permiso')">
                 {{ permiso.NombreArea ? 'Área ' + permiso.NombreArea : 'Otra área' }}
               </span>
-              }
-              } @else {
-              <span class="closed">Anulado</span>
               }
             </td>
           </tr>
@@ -309,9 +306,6 @@
           }
         </p>
         }
-
-        <label for="dia-solicitud">Fecha de solicitud</label>
-        <input id="dia-solicitud" type="date" [(ngModel)]="diaForm.FechaSolicitud" [max]="hoy" name="diaSolicitud" required />
         } @else {
         <label for="hora-fecha">Fecha del permiso</label>
         <input id="hora-fecha" type="date" [(ngModel)]="horaForm.Fecha" name="horaFecha" required />
@@ -332,6 +326,10 @@
         <p class="form-preview">Duración: <strong>{{ formatMinutes(horaPreview) }}</strong></p>
         }
         }
+
+        <!-- Común a los dos tipos: puede ser posterior al permiso, pero no una fecha futura. -->
+        <label for="permiso-solicitud">Fecha de solicitud</label>
+        <input id="permiso-solicitud" type="date" [(ngModel)]="comunForm.FechaSolicitud" [max]="hoy" name="permisoSolicitud" required />
 
         <button type="submit" [disabled]="isSaving">
           {{ isSaving ? 'Guardando...' : (editingId === null ? 'Registrar permiso' : 'Guardar cambios') }}
@@ -389,7 +387,6 @@
               <th class="num">DURACIÓN</th>
               <th>MOTIVO</th>
               <th>ESTADO</th>
-              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -414,14 +411,9 @@
                 <span class="estado-badge" [class.anulado]="estado(permiso) === 'ANULADO'"
                   [class.finalizado]="estado(permiso) === 'FINALIZADO'">{{ estado(permiso) }}</span>
               </td>
-              <td>
-                @if (permiso.Estado === 'ACTIVO') {
-                <button type="button" class="secondary" (click)="imprimir(permiso)">Constancia</button>
-                }
-              </td>
             </tr>
             } @empty {
-            <tr><td colspan="7" class="empty">El empleado no tiene permisos registrados.</td></tr>
+            <tr><td colspan="6" class="empty">El empleado no tiene permisos registrados.</td></tr>
             }
           </tbody>
         </table>
@@ -482,11 +474,11 @@
         <div class="form-pair">
           <div>
             <label for="report-from">Desde</label>
-            <input id="report-from" type="date" [(ngModel)]="reportFilters.desde" name="reportFrom" />
+            <input id="report-from" type="date" [(ngModel)]="reportFilters.desde" name="reportFrom" required />
           </div>
           <div>
             <label for="report-to">Hasta</label>
-            <input id="report-to" type="date" [(ngModel)]="reportFilters.hasta" name="reportTo" />
+            <input id="report-to" type="date" [(ngModel)]="reportFilters.hasta" name="reportTo" required />
           </div>
         </div>
 
@@ -502,20 +494,49 @@
           @for (item of estados; track item.value) { <option [value]="item.value">{{ item.label }}</option> }
         </select>
 
-        <label for="report-employee">Empleado</label>
-        <select id="report-employee" [(ngModel)]="reportFilters.idEmpleado" name="reportEmployee">
-          <option [ngValue]="0">Todos</option>
-          @for (empleado of empleadosForm; track empleado.IdEmpleado) {
-          <option [ngValue]="empleado.IdEmpleado">{{ empleadoLabel(empleado) }}</option>
-          }
-        </select>
+        <!-- Todos los empleados, o solo los que se marquen en la lista. -->
+        <fieldset class="report-empleados">
+          <legend>Empleados</legend>
+          <div class="report-empleados-modo">
+            <label class="check-option">
+              <input type="radio" name="reportModoEmpleados" [value]="true" [(ngModel)]="reportTodosEmpleados" /> Todos
+            </label>
+            <label class="check-option">
+              <input type="radio" name="reportModoEmpleados" [value]="false" [(ngModel)]="reportTodosEmpleados" />
+              Seleccionar empleados
+            </label>
+          </div>
 
-        @if (reportCountExacto) {
+          @if (!reportTodosEmpleados) {
+          <input type="search" [(ngModel)]="reportBusqueda" name="reportBusqueda" placeholder="Buscar por nombre o No. de pago"
+            aria-label="Buscar empleado" (keydown.enter)="$event.preventDefault()" />
+          <div class="report-empleados-acciones">
+            <span>{{ reportFilters.idsEmpleado.length }} seleccionado(s)</span>
+            <button type="button" class="link-button" (click)="marcarVisibles()">Seleccionar todos</button>
+            <button type="button" class="link-button" (click)="quitarSeleccion()">Quitar selección</button>
+          </div>
+          <div class="report-empleados-lista">
+            @for (empleado of reportEmpleados; track empleado.IdEmpleado) {
+            <label class="check-option">
+              <input type="checkbox" [checked]="reportSeleccionado(empleado.IdEmpleado)"
+                (change)="toggleReportEmpleado(empleado.IdEmpleado, $any($event.target).checked)" />
+              {{ empleadoLabel(empleado) }}
+            </label>
+            } @empty {
+            <p class="field-hint">No hay empleados que coincidan.</p>
+            }
+          </div>
+          }
+        </fieldset>
+
+        @if (reportRangoAviso) {
+        <p class="field-hint" aria-live="polite">{{ reportRangoAviso }}</p>
+        } @else if (reportCountExacto) {
         <p class="field-hint">{{ reportCount }} permiso(s) cumplen los filtros.</p>
         } @else {
         <p class="field-hint">Incluye permisos anteriores al {{ formatDay(cargadoDesde) }}: el total se calcula al exportar.</p>
         }
-        <button type="submit" [disabled]="isExporting">{{ isExporting ? 'Generando...' : 'Exportar a Excel' }}</button>
+        <button type="submit" [disabled]="isExporting || !!reportRangoAviso">{{ isExporting ? 'Generando...' : 'Exportar a Excel' }}</button>
       </form>
     </section>
   </div>

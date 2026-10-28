@@ -1,6 +1,5 @@
 import { Permiso } from './permisos.models';
 import { filterPermisosForReport, emptyPermisoReportFilters } from './permisos-report';
-import { imprimirConstancia } from './permisos-constancia';
 import {
   consumoEmpleado, consumoTexto, estadoVista, formatMinutes, inPeriod, minutesBetween, overlaps, resumenPorEmpleado,
   weekRange, weekdaysBetween,
@@ -100,16 +99,6 @@ describe('permisos resumen', () => {
     // Al editar, el permiso propio no se cuenta.
     expect(consumoTexto(consumoEmpleado(permisos, 10, new Date(2026, 9, 27), 480, 2).Mes)).toBe('3 días');
     expect(consumoTexto(consumoEmpleado(permisos, 99, new Date(2026, 9, 27), 480).Mes)).toBe('Sin permisos');
-  });
-
-  it('prints the certificate from a hidden frame with the permit data', () => {
-    imprimirConstancia(permiso({ Motivo: 'Cita <médica>' }));
-    const frame = document.querySelector('iframe');
-    expect(frame?.srcdoc).toContain('ANA LOPEZ');
-    expect(frame?.srcdoc).toContain('Cita &lt;médica&gt;');
-    expect(frame?.srcdoc).toContain('Jefe inmediato');
-    expect(frame?.srcdoc).toContain('GERENCIA DE INFORMATICA');
-    frame?.remove();
   });
 
   it('converts hours to days with the workday of each permit department', () => {

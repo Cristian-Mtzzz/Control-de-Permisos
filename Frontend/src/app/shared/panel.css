@@ -1,40 +1,9 @@
-/* Estilos del Taller: operaciones, tabla de reparaciones y ventanas modales. */
+/* Estilos comunes de los paneles: secciones, tablas, mensajes y ventanas modales. */
 :host {
     display: block;
     min-height: 100dvh;
     background: #f4f8f6;
     color: #203238;
-}
-
-.workshop-modal.reception-page {
-    width: min(1040px, 100%);
-    max-height: none;
-    margin: 0 auto;
-    overflow: visible;
-}
-
-.paper-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .75rem 1rem;
-}
-
-.form-field {
-    display: grid;
-    gap: .4rem;
-    min-width: 0;
-}
-
-.form-field-wide,
-.form-section-title {
-    grid-column: 1 / -1;
-}
-
-.form-section-title {
-    margin: .5rem 0 0;
-    padding-bottom: .45rem;
-    border-bottom: 1px solid #d8e4e0;
-    color: #18383b;
-    font-size: .95rem;
 }
 
 .workshop-shell {
@@ -46,9 +15,6 @@
 }
 
 /* Dentro del panel Admin el taller usa el margen del panel contenedor. */
-.workshop-shell.embedded {
-    padding: 0;
-}
 
 .eyebrow {
     margin: 0 0 .65rem;
@@ -91,20 +57,6 @@ h1 {
     margin-top: 2rem;
 }
 
-.maintenance-form {
-    display: grid;
-    grid-template-columns: 1.5fr 1fr;
-    gap: .75rem;
-    align-items: end;
-    padding: 0;
-}
-
-.maintenance-form h2 {
-    grid-column: 1 / -1;
-    color: #18383b;
-    font-size: 1.1rem;
-}
-
 select,
 textarea {
     width: 100%;
@@ -128,13 +80,7 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
 }
 
-.form-actions {
-    display: flex;
-    gap: .6rem;
-    grid-column: 1 / -1;
-}
 
-.form-actions button,
 .secondary {
     padding: .75rem 1rem;
     border: 0;
@@ -145,7 +91,7 @@ textarea:focus {
     font-weight: 700;
 }
 
-.form-actions .secondary,
+
 .secondary {
     border: 1px solid #b9d1ca;
     color: #276968;
@@ -194,32 +140,9 @@ th {
     font-weight: 700;
 }
 
-.status.en_reparacion {
-    color: #8a5a13;
-    background: #fff1cc;
-}
-
-.status.terminado {
-    color: #28658a;
-    background: #dceefa;
-}
-
 @media (max-width: 760px) {
     .workshop-header {
         flex-direction: column;
-    }
-
-    .maintenance-form {
-        grid-template-columns: 1fr;
-    }
-
-    .paper-form {
-        grid-template-columns: 1fr;
-    }
-
-    .form-field-wide,
-    .form-section-title {
-        grid-column: auto;
     }
 }
 
@@ -310,14 +233,6 @@ td button:disabled {
     padding: 1rem;
     overflow: auto;
     background: rgba(12, 38, 39, .48);
-}
-
-.reception-page-backdrop {
-    position: static;
-    display: block;
-    min-height: calc(100dvh - 150px);
-    padding: 1.5rem 0;
-    background: transparent;
 }
 
 .workshop-modal {
@@ -414,19 +329,4 @@ td button:disabled {
 .workshop-modal select:focus {
     border-color: #397b78;
     box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
-}
-/* El número de memo se muestra completo, sin partirse en varias líneas. */
-.memo-cell {
-    white-space: nowrap;
-}
-
-/* Rango de fechas de los reportes (Taller y Tickets): Desde y Hasta en la misma fila. */
-.report-date-range {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: .75rem;
-}
-
-.report-date-range label {
-  display: block;
 }

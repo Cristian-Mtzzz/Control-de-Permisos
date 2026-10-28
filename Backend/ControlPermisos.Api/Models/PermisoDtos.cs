@@ -47,13 +47,17 @@ public sealed record SavePermisoDiaDto(
     DateTime FechaFin,
     DateTime FechaSolicitud);
 
-/// <summary>Permiso por hora: una fecha con hora de salida y de entrada en formato HH:mm.</summary>
+/// <summary>
+/// Permiso por hora: una fecha con hora de salida y de entrada en formato HH:mm, y la fecha en
+/// que se hizo la solicitud.
+/// </summary>
 public sealed record SavePermisoHoraDto(
     int IdEmpleado,
     string Motivo,
     DateTime Fecha,
     string HoraSalida,
-    string HoraEntrada);
+    string HoraEntrada,
+    DateTime FechaSolicitud);
 
 /// <summary>
 /// Quién está en sesión dentro del Control de permisos. Nivel es uno de PermisoValores.Nivel*.

@@ -12,7 +12,7 @@ Sistema web para registrar y controlar los permisos de los empleados de una inst
 
 | Sección | Para qué sirve |
 | --- | --- |
-| **Permisos** | Permisos por día (días hábiles) y por hora (dentro de la jornada), con revisión de choques y límites, edición, anulación, indicadores del día, la semana y el mes, historial por empleado, constancia imprimible y reporte en Excel. |
+| **Permisos** | Permisos por día (días hábiles) y por hora (dentro de la jornada), con revisión de choques y límites, edición, anulación, indicadores del día, la semana y el mes, historial por empleado y reporte en Excel. |
 | **Personal** | Empleados de cada área. Cada jefe agrega a su gente; los administradores la mueven entre áreas. |
 | **Departamentos, áreas y jefes** | Departamentos que usan el sistema, sus áreas y los usuarios con su nivel de acceso. |
 

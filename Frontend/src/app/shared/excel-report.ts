@@ -1,8 +1,7 @@
 import type * as ExcelJS from 'exceljs';
 
 /**
- * Formato común de los reportes de Excel del sistema (Dispositivos, Reasignaciones, Taller y
- * Tickets). Cada hoja de detalle lleva:
+ * Formato de los reportes de Excel del Control de permisos. Cada hoja lleva:
  *  - fila 1: título en blanco sobre verde oscuro;
  *  - fila 2: totales, filtros usados y fecha de generación;
  *  - fila 4 en adelante: tabla de Excel con filtros, filas alternadas y encabezado fijo.
@@ -10,19 +9,19 @@ import type * as ExcelJS from 'exceljs';
  * de la celda), para que el archivo muestre lo mismo que la pantalla.
  */
 
-export type ReportCell = string | number | Date;
+type ReportCell = string | number | Date;
 
 export interface ReportColumn<T> {
   header: string;
   width: number;
   value: (row: T) => ReportCell;
-  // Formato de las fechas: con hora (como "Fecha y hora") o solo el día (como "Fecha de asignación").
-  format?: 'datetime' | 'date';
+  // Fecha sin hora (dd/mm/aa).
+  format?: 'date';
   // Texto largo (detalle, observaciones): se ajusta a varias líneas.
   wrap?: boolean;
 }
 
-export interface ReportSheet<T> {
+interface ReportSheet<T> {
   sheetName: string;
   title: string;
   subtitle: string;
@@ -47,7 +46,7 @@ export async function createReportWorkbook(subject: string): Promise<ExcelJS.Wor
 }
 
 /** Encabezado del reporte (título y subtítulo) en las filas 1 y 2 de la hoja. */
-export function addReportHeader(sheet: ExcelJS.Worksheet, columnCount: number, title: string, subtitle: string): void {
+function addReportHeader(sheet: ExcelJS.Worksheet, columnCount: number, title: string, subtitle: string): void {
   const lastColumn = sheet.getColumn(Math.max(columnCount, 1)).letter;
   sheet.mergeCells(`A1:${lastColumn}1`);
   sheet.getCell('A1').value = title;
@@ -79,7 +78,6 @@ export function addReportSheet<T>(workbook: ExcelJS.Workbook, report: ReportShee
   report.columns.forEach((definition, index) => {
     const column = sheet.getColumn(index + 1);
     column.width = definition.width;
-    if (definition.format === 'datetime') column.numFmt = 'dd/mm/yy hh:mm';
     if (definition.format === 'date') column.numFmt = 'dd/mm/yy';
     if (definition.wrap) column.alignment = { wrapText: true, vertical: 'top' };
   });
@@ -131,41 +129,6 @@ export async function downloadReportWorkbook(workbook: ExcelJS.Workbook, fileNam
   link.click();
   link.remove();
   window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
-}
-
-/** Rango de fechas de un reporte: valores yyyy-mm-dd de los campos de fecha; vacío = sin límite. */
-export interface ReportDateRange {
-  desde: string;
-  hasta: string;
-}
-
-export const emptyReportDateRange = (): ReportDateRange => ({ desde: '', hasta: '' });
-
-/** true si "desde" es posterior a "hasta". */
-export function isInvalidDateRange(range: ReportDateRange): boolean {
-  return !!range.desde && !!range.hasta && range.desde > range.hasta;
-}
-
-/** true si la fecha de la API cae en el rango (días completos). Sin rango entra todo; sin fecha, nada. */
-export function isInDateRange(value: string | null | undefined, range: ReportDateRange): boolean {
-  if (!range.desde && !range.hasta) return true;
-  const date = value ? new Date(value) : null;
-  if (!date || Number.isNaN(date.getTime())) return false;
-  if (range.desde && date < new Date(`${range.desde}T00:00:00`)) return false;
-  if (range.hasta && date > new Date(`${range.hasta}T23:59:59.999`)) return false;
-  return true;
-}
-
-/** Texto del rango para el subtítulo: "Del 01/10/26 al 27/10/26", "Desde el 01/10/26"... */
-export function dateRangeLabel(range: ReportDateRange, empty = 'Todas las fechas'): string {
-  const format = (value: string) => {
-    const [year, month, day] = value.split('-');
-    return `${day}/${month}/${year.slice(-2)}`;
-  };
-  if (range.desde && range.hasta) return `Del ${format(range.desde)} al ${format(range.hasta)}`;
-  if (range.desde) return `Desde el ${format(range.desde)}`;
-  if (range.hasta) return `Hasta el ${format(range.hasta)}`;
-  return empty;
 }
 
 /** Nombre de archivo con la fecha del día: reporte-<nombre>-AAAA-MM-DD.xlsx */

@@ -45,8 +45,17 @@ public sealed class PermisosControllerTests
     [Fact]
     public async Task PermisoPorHoraSinHorasSeRechaza()
     {
-        var permiso = new SavePermisoHoraDto(10, "Trámite", DateTime.Today, "09:00", " ");
+        var permiso = new SavePermisoHoraDto(10, "Trámite", DateTime.Today, "09:00", " ", DateTime.Today);
         EsBadRequest(await Controller.CreatePermisoHora(permiso, default), "hora de salida y la hora de entrada");
+    }
+
+    [Fact]
+    public async Task PermisoPorHoraSinFechaDeSolicitudOFuturaSeRechaza()
+    {
+        var sinFecha = new SavePermisoHoraDto(10, "Trámite", DateTime.Today, "09:00", "10:00", default);
+        var futura = sinFecha with { FechaSolicitud = DateTime.Today.AddDays(1) };
+        EsBadRequest(await Controller.CreatePermisoHora(sinFecha, default), "fecha en que se hizo la solicitud");
+        EsBadRequest(await Controller.UpdatePermisoHora(5, futura, default), "posterior a hoy");
     }
 
     [Fact]

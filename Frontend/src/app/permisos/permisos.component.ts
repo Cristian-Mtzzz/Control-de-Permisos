@@ -22,7 +22,6 @@ import {
 } from './permisos-resumen';
 import { PermisosPersonalComponent } from './permisos-personal.component';
 import { PermisosAreasComponent } from './permisos-areas.component';
-import { imprimirConstancia } from './permisos-constancia';
 
 // 'permiso': un solo formulario; el tipo elegido decide qué datos se piden.
 // 'historial': todos los permisos de un empleado con sus totales.
@@ -38,7 +37,7 @@ const emptyDia = (): SavePermisoDiaRequest => ({
   IdEmpleado: 0, Motivo: '', FechaInicio: '', FechaFin: '', FechaSolicitud: today(),
 });
 const emptyHora = (): SavePermisoHoraRequest => ({
-  IdEmpleado: 0, Motivo: '', Fecha: '', HoraSalida: '', HoraEntrada: '',
+  IdEmpleado: 0, Motivo: '', Fecha: '', HoraSalida: '', HoraEntrada: '', FechaSolicitud: today(),
 });
 
 @Component({
@@ -153,9 +152,10 @@ export class PermisosComponent {
 
   // Editar y anular, como lo valida la API: solo los permisos registrados en el alcance del
   // usuario. El jefe y el de departamento también ven los que su personal tiene de otra área o
-  // de antes (cuentan para sus choques y límites), pero no los modifican.
+  // de antes (cuentan para sus choques y límites), pero no los modifican. Un permiso finalizado
+  // ya no se edita ni se anula.
   puedeModificar(permiso: Permiso): boolean {
-    if (this.soloLectura || !isActive(permiso)) return false;
+    if (this.soloLectura || this.estado(permiso) !== 'ACTIVO') return false;
     if (this.veTodo) return true;
     if (this.nivel === 'JEFE') return permiso.IdArea !== null && permiso.IdArea === this.sesion?.IdArea;
     return permiso.IdDepartamento !== null && permiso.IdDepartamento === this.sesion?.IdDepartamento;
@@ -293,11 +293,6 @@ export class PermisosComponent {
     this.fechaDesde = '';
     this.fechaHasta = '';
     this.permisoPage = 1;
-  }
-
-  // Abre el diálogo de impresión con la constancia del permiso para firmarla.
-  imprimir(permiso: Permiso): void {
-    imprimirConstancia(permiso);
   }
 
   // ---- Historial por empleado ----------------------------------------------------------
@@ -468,27 +463,29 @@ export class PermisosComponent {
       Fecha: apiDay(permiso.FechaInicio),
       HoraSalida: permiso.HoraSalida ?? '',
       HoraEntrada: permiso.HoraEntrada ?? '',
+      // Los permisos por hora anteriores a este campo no la tienen: se propone hoy.
+      FechaSolicitud: apiDay(permiso.FechaSolicitud) || today(),
     };
     this.activeWindow = 'permiso';
   }
 
-  // Empleado y motivo son comunes: se guardan en el formulario del tipo elegido.
-  get comunForm(): { IdEmpleado: number; Motivo: string } {
+  // Empleado, motivo y fecha de solicitud son comunes: se guardan en el formulario del tipo elegido.
+  get comunForm(): { IdEmpleado: number; Motivo: string; FechaSolicitud: string } {
     return this.formTipo === 'DIA' ? this.diaForm : this.horaForm;
   }
 
-  // Al cambiar de tipo se conservan el empleado, el motivo y la fecha ya escritos: la fecha del
+  // Al cambiar de tipo se conservan el empleado, el motivo y las fechas ya escritas: la fecha del
   // permiso por hora pasa a ser el rango del de día, y la primera fecha del de día, la del de hora.
   changeTipo(tipo: PermisoTipo): void {
     if (tipo === this.formTipo) return;
-    const { IdEmpleado, Motivo } = this.comunForm;
+    const { IdEmpleado, Motivo, FechaSolicitud } = this.comunForm;
     if (tipo === 'DIA' && this.horaForm.Fecha && !this.diaForm.FechaInicio) {
       this.diaForm.FechaInicio = this.horaForm.Fecha;
       this.diaForm.FechaFin = this.horaForm.Fecha;
     }
     if (tipo === 'HORA' && this.diaForm.FechaInicio && !this.horaForm.Fecha) this.horaForm.Fecha = this.diaForm.FechaInicio;
     this.formTipo = tipo;
-    Object.assign(this.comunForm, { IdEmpleado, Motivo });
+    Object.assign(this.comunForm, { IdEmpleado, Motivo, FechaSolicitud });
     this.errorMessage = '';
   }
 
@@ -576,14 +573,7 @@ export class PermisosComponent {
       this.errorMessage = 'La fecha final no puede ser anterior a la fecha inicial.';
       return;
     }
-    if (!form.FechaSolicitud) {
-      this.errorMessage = 'Indica la fecha en que se hizo la solicitud.';
-      return;
-    }
-    if (form.FechaSolicitud > today()) {
-      this.errorMessage = 'La fecha de solicitud no puede ser posterior a hoy.';
-      return;
-    }
+    if (this.fechaSolicitudInvalida(form.FechaSolicitud)) return;
 
     this.save(this.permisosService.savePermisoDia(this.editingId, { ...form, Motivo: form.Motivo.trim().toLocaleUpperCase('es') }));
   }
@@ -612,8 +602,16 @@ export class PermisosComponent {
       this.errorMessage = 'La hora de entrada debe ser posterior a la hora de salida.';
       return;
     }
+    if (this.fechaSolicitudInvalida(form.FechaSolicitud)) return;
 
     this.save(this.permisosService.savePermisoHora(this.editingId, { ...form, Motivo: form.Motivo.trim().toLocaleUpperCase('es') }));
+  }
+
+  // Obligatoria en los dos tipos; puede ser posterior al permiso, pero no una fecha que todavía no llega.
+  private fechaSolicitudInvalida(fechaSolicitud: string): boolean {
+    if (!fechaSolicitud) this.errorMessage = 'Indica la fecha en que se hizo la solicitud.';
+    else if (fechaSolicitud > today()) this.errorMessage = 'La fecha de solicitud no puede ser posterior a hoy.';
+    return this.errorMessage !== '';
   }
 
   private save(request: Observable<void>): void {
@@ -649,8 +647,50 @@ export class PermisosComponent {
 
   // ---- Reporte -------------------------------------------------------------------------
 
+  // Empleados del reporte: todos, o solo los marcados en la lista (reportFilters.idsEmpleado).
+  reportTodosEmpleados = true;
+  reportBusqueda = '';
+
+  // Filtros con los que se exporta: con "Todos" no se filtra por empleado aunque haya marcados.
+  private get reportFiltros(): PermisoReportFilters {
+    return { ...this.reportFilters, idsEmpleado: this.reportTodosEmpleados ? [] : this.reportFilters.idsEmpleado };
+  }
+
+  // Lista de casillas: los empleados de la pantalla que coinciden con la búsqueda.
+  get reportEmpleados(): PermisoEmpleado[] {
+    const term = this.reportBusqueda.trim().toUpperCase();
+    return this.empleadosForm.filter((empleado) =>
+      !term || empleado.NombreCompleto.toUpperCase().includes(term) || (empleado.NoPago ?? '').includes(term));
+  }
+
+  reportSeleccionado(idEmpleado: number): boolean {
+    return this.reportFilters.idsEmpleado.includes(idEmpleado);
+  }
+
+  toggleReportEmpleado(idEmpleado: number, marcado: boolean): void {
+    const ids = this.reportFilters.idsEmpleado.filter((id) => id !== idEmpleado);
+    this.reportFilters.idsEmpleado = marcado ? [...ids, idEmpleado] : ids;
+  }
+
+  // Marca los que están a la vista (los de la búsqueda) sin quitar los ya marcados.
+  marcarVisibles(): void {
+    this.reportFilters.idsEmpleado = [...new Set([...this.reportFilters.idsEmpleado, ...this.reportEmpleados.map((e) => e.IdEmpleado)])];
+  }
+
+  quitarSeleccion(): void {
+    this.reportFilters.idsEmpleado = [];
+  }
+
   get reportCount(): number {
-    return filterPermisosForReport(this.enAlcance, this.reportFilters, this.estadoDe).length;
+    return filterPermisosForReport(this.enAlcance, this.reportFiltros, this.estadoDe).length;
+  }
+
+  // El reporte pide el rango completo: mientras haya aviso, el botón de exportar queda deshabilitado.
+  get reportRangoAviso(): string {
+    const { desde, hasta } = this.reportFilters;
+    if (!desde || !hasta) return 'Elige la fecha "desde" y la fecha "hasta" para exportar el reporte.';
+    if (desde > hasta) return 'La fecha "desde" no puede ser posterior a la fecha "hasta".';
+    return '';
   }
 
   // El conteo previo solo es exacto si el rango del reporte está dentro de lo cargado en pantalla.
@@ -661,24 +701,33 @@ export class PermisosComponent {
   openReportWindow(): void {
     this.clearMessages();
     this.reportFilters = emptyPermisoReportFilters();
+    this.reportTodosEmpleados = true;
+    this.reportBusqueda = '';
     this.activeWindow = 'report';
   }
 
-  // Pide a la API los permisos del rango (todo el historial si no hay "desde"), con datos al día,
-  // aplica los filtros y descarga el Excel.
+  // Pide a la API los permisos del rango, con datos al día, aplica los filtros y descarga el Excel.
   async exportReport(): Promise<void> {
     this.clearMessages();
-    if (this.reportFilters.desde && this.reportFilters.hasta && this.reportFilters.desde > this.reportFilters.hasta) {
-      this.errorMessage = 'La fecha "desde" no puede ser posterior a la fecha "hasta".';
+    if (this.reportRangoAviso) {
+      this.errorMessage = this.reportRangoAviso;
+      return;
+    }
+    const filtros = this.reportFiltros;
+    if (!this.reportTodosEmpleados && filtros.idsEmpleado.length === 0) {
+      this.errorMessage = 'Marca al menos un empleado o elige "Todos".';
       return;
     }
     this.isExporting = true;
     try {
-      const { desde, idEmpleado } = this.reportFilters;
-      const delRango = await firstValueFrom(this.permisosService.getPermisos({ desde, idEmpleado }));
-      const permisos = filterPermisosForReport(this.filtrarAlcance(delRango), this.reportFilters, this.estadoDe);
-      const employee = this.empleados.find((item) => item.IdEmpleado === this.reportFilters.idEmpleado)?.NombreCompleto ?? '';
-      await exportPermisosReport(permisos, this.reportFilters, employee, this.minutosDe, this.alcanceNombre, this.estadoDe);
+      // Con un solo empleado la API ya trae solo los suyos; con varios se filtran aquí.
+      const idEmpleado = filtros.idsEmpleado.length === 1 ? filtros.idsEmpleado[0] : undefined;
+      const delRango = await firstValueFrom(this.permisosService.getPermisos({ desde: filtros.desde, idEmpleado }));
+      const permisos = filterPermisosForReport(this.filtrarAlcance(delRango), filtros, this.estadoDe);
+      const nombres = filtros.idsEmpleado.map((id) =>
+        this.empleados.find((item) => item.IdEmpleado === id)?.NombreCompleto
+        ?? delRango.find((item) => item.IdEmpleado === id)?.Empleado ?? `#${id}`);
+      await exportPermisosReport(permisos, filtros, nombres, this.minutosDe, this.alcanceNombre, this.estadoDe);
       this.closeWindow();
       this.message = `Reporte de permisos exportado: ${permisos.length} permisos.`;
     } catch (error) {

@@ -23,156 +23,7 @@ input {
     font: inherit;
 }
 
-.table-id-column {
-    width: 4.25rem;
-    min-width: 4.25rem;
-    max-width: 4.25rem;
-    white-space: nowrap;
-}
-
-.table-brand-column {
-    width: 4.25rem;
-    min-width: 4.25rem;
-    max-width: 4.25rem;
-}
-
-.table-serial-column {
-    width: 14rem;
-    min-width: 14rem;
-    max-width: 14rem;
-    overflow-wrap: normal;
-    white-space: nowrap;
-}
-
-.combo-inventory-table {
-    min-width: 1120px;
-}
-
-.combo-inventory-table .combo-shared-cell {
-    vertical-align: middle;
-    background: #e4f1dc;
-}
-
-.combo-inventory-table .combo-group-alt td {
-    background: #f1f7ed;
-}
-
-.combo-inventory-table .combo-group-alt .combo-shared-cell {
-    background: #e4f1dc;
-}
-
-.combo-inventory-table .combo-actions {
-    white-space: nowrap;
-}
-
-.admin-shell .edit-modal.device-create-modal {
-    width: min(1080px, 100%);
-    max-height: calc(100dvh - 2rem);
-    overflow-y: auto;
-    padding: clamp(1.25rem, 2vw, 2rem);
-}
-
-.admin-shell .modal-form.device-create-form {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 1rem;
-}
-
-.admin-shell .device-create-top-row {
-    display: grid;
-    grid-template-columns: minmax(0, 2fr) minmax(130px, 1fr);
-    align-items: end;
-    gap: 1rem;
-}
-
-.admin-shell .device-create-identification,
-.admin-shell .device-create-assignment-location,
-.admin-shell .device-create-employee-fields {
-    display: grid;
-    gap: .85rem 1rem;
-}
-
-.admin-shell .device-create-identification,
-.admin-shell .device-create-assignment-location {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.admin-shell .device-create-employee-fields {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.admin-shell .device-create-field {
-    display: grid;
-    min-width: 0;
-    gap: .35rem;
-    color: #294649;
-    font-size: .76rem;
-    font-weight: 700;
-}
-
-.admin-shell .device-create-field input,
-.admin-shell .device-create-field select {
-    width: 100%;
-    min-width: 0;
-    font: inherit;
-    font-size: .9rem;
-    font-weight: 400;
-}
-
-.admin-shell .device-create-combo-number {
-    max-width: 360px;
-}
-
-.admin-shell .desktop-combo-components {
-    display: grid;
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
-}
-
-.admin-shell .desktop-combo-component {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: .75rem;
-    margin: 0;
-    padding: 1rem;
-    border: 1px solid #d8e4e0;
-    border-radius: 8px;
-    background: #f8fbfa;
-}
-
-.admin-shell .desktop-combo-component legend {
-    padding: 0 .35rem;
-    color: #276968;
-    font-size: .85rem;
-    font-weight: 700;
-}
-
-@media (max-width: 760px) {
-    .admin-shell .device-create-identification,
-    .admin-shell .device-create-assignment-location {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
-
-    .admin-shell .desktop-combo-components {
-        grid-template-columns: 1fr;
-    }
-
-    .admin-shell .device-create-employee-fields {
-        grid-template-columns: 1fr;
-    }
-}
-
-@media (max-width: 520px) {
-    .admin-shell .device-create-top-row,
-    .admin-shell .device-create-identification,
-    .admin-shell .device-create-assignment-location {
-        grid-template-columns: 1fr;
-    }
-}
-
 .refresh-button,
-.admin-shell .refresh-button,
-.inventory-shell .refresh-button,
 .workshop-shell .refresh-button {
     padding: .78rem 1rem !important;
     border: 0 !important;
@@ -186,8 +37,6 @@ input {
 }
 
 .refresh-button:hover:not(:disabled),
-.admin-shell .refresh-button:hover:not(:disabled),
-.inventory-shell .refresh-button:hover:not(:disabled),
 .workshop-shell .refresh-button:hover:not(:disabled) {
     background: #1b5252 !important;
     box-shadow: 0 6px 14px rgba(39, 105, 104, .2);
@@ -199,8 +48,6 @@ input {
     opacity: .65;
 }
 
-.admin-shell .logout-button,
-.inventory-shell .logout-button,
 .workshop-shell .logout-button {
     padding: .72rem 1rem !important;
     border: 1px solid #d99b93 !important;
@@ -213,8 +60,6 @@ input {
     transition: background .2s, border-color .2s, box-shadow .2s, transform .2s;
 }
 
-.admin-shell .logout-button:hover,
-.inventory-shell .logout-button:hover,
 .workshop-shell .logout-button:hover {
     border-color: #bd5b52 !important;
     background: #fcece9 !important;
@@ -222,247 +67,14 @@ input {
     transform: translateY(-1px);
 }
 
-.workshop-header-actions {
-    display: flex;
-    align-items: center;
-    gap: .75rem;
-}
-
-.admin-table-toolbar {
-    justify-self: stretch;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1.25rem;
-    width: 100%;
-    max-width: 100%;
-    padding: .35rem 0;
-    color: #344b4b;
-    background: transparent;
-    font-size: .82rem;
-    font-weight: 700;
-}
-
-.admin-page-size,
-.admin-table-search {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    white-space: nowrap;
-}
-
-.admin-page-size select {
-    width: 4.25rem;
-    padding: .4rem .45rem;
-    border-color: #c8d7d2;
-}
-
-.admin-table-search input {
-    width: 12rem;
-    padding: .45rem .6rem;
-    border-color: #c8d7d2;
-}
-
-.admin-shell .admin-form.compact .reassignment-submit {
-    grid-column: 1 / -1;
-    justify-self: end;
-    width: fit-content;
-}
-
-.admin-shell .devices-section-toolbar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: .25rem;
-}
-
-.admin-shell .devices-section-toolbar .add-user-button {
-    margin-bottom: 0;
-}
-
-.admin-shell .devices-toolbar-group {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .6rem;
-}
-
-.admin-shell .report-launch-button {
-    min-height: 2.65rem;
-    padding: .65rem 1rem;
-    border: 1px solid #276968;
-    border-radius: 5px;
-    color: #276968;
-    background: transparent;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.admin-shell .report-launch-button:hover {
-    background: #e8f2ee;
-}
-
 /* Buscador, filtro, "Mostrar N registros" y "Añadir usuario" van en una sola fila;
    la columna flexible antes del selector lo empuja junto al botón, a la derecha. */
-.admin-shell .filter-bar.user-filter-bar {
-    grid-template-columns: minmax(0, 1fr) minmax(160px, 220px) auto minmax(0, 1fr) auto;
-    align-items: center;
-}
 
-.admin-shell .filter-bar.user-filter-bar .add-user-button {
-    justify-self: end;
-    margin: 0;
-}
-
-.admin-shell .filter-bar.user-filter-bar app-table-page-size {
-    margin-bottom: 0;
-}
-
-.admin-data-table-wrap {
-    overflow-x: auto;
-}
-
-.admin-shell .table-wrap,
-.inventory-shell .table-wrap,
-.workshop-shell .table-wrap,
-.admin-shell .admin-data-table-wrap {
+.workshop-shell .table-wrap {
     width: 100%;
     border: 1px solid #d5e1dd;
     border-radius: 6px;
     background: #fff;
-}
-
-.admin-data-table {
-    width: 100%;
-    border-collapse: separate;
-    border-spacing: 0;
-    color: #243a40;
-    font-size: .84rem;
-    table-layout: auto;
-}
-
-.admin-device-table {
-    min-width: 1320px;
-}
-
-.admin-reassignment-table {
-    min-width: 850px;
-}
-
-.admin-data-table th,
-.admin-data-table td {
-    padding: .7rem .75rem;
-    border-right: 1px solid #e2e9e6;
-    border-bottom: 1px solid #e2e9e6;
-    text-align: left;
-    vertical-align: middle;
-}
-
-.admin-data-table th {
-    color: #31504d;
-    background: #edf4f1;
-    font-size: .75rem;
-    font-weight: 800;
-    text-align: center;
-    text-transform: none;
-    letter-spacing: 0;
-    white-space: nowrap;
-}
-
-.admin-data-table tbody tr:nth-child(even) {
-    background: #f5f8f7;
-}
-
-.admin-data-table tbody tr:hover {
-    background: #e8f2ef;
-}
-
-.admin-data-table tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.admin-data-table td:last-child,
-.admin-data-table th:last-child {
-    border-right: 0;
-}
-
-.admin-sort {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    padding: 0;
-    border: 0;
-    color: inherit;
-    background: transparent;
-    cursor: pointer;
-    font: inherit;
-    font-weight: inherit;
-}
-
-.admin-sort span {
-    color: #829691;
-    font-size: .65rem;
-}
-
-.admin-table-pagination {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    color: #617573;
-    font-size: .8rem;
-}
-
-.admin-page-buttons {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .25rem;
-}
-
-.admin-page-buttons button {
-    min-width: 2.15rem;
-    min-height: 2.15rem;
-    padding: .4rem .65rem;
-    border: 1px solid #cfdbd7;
-    border-radius: 4px;
-    color: #315c59;
-    background: #fff;
-    cursor: pointer;
-    font-size: .78rem;
-    font-weight: 700;
-}
-
-.admin-page-buttons button.active {
-    border-color: #276968;
-    color: #fff;
-    background: #276968;
-}
-
-.admin-page-buttons button:disabled {
-    cursor: not-allowed;
-    opacity: .42;
-}
-
-@media (max-width: 640px) {
-    .admin-table-toolbar {
-        flex-wrap: wrap;
-        gap: .65rem;
-        justify-self: stretch;
-        padding: .6rem;
-    }
-
-    .admin-table-search input {
-        width: min(11rem, 45vw);
-    }
-
-    .admin-shell .filter-bar.user-filter-bar {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .admin-table-pagination {
-        align-items: flex-start;
-        flex-direction: column;
-    }
 }
 
 /* Respuesta táctil moderna para todos los botones del sistema. */
@@ -479,94 +91,7 @@ button:focus-visible {
     outline-offset: 2px;
 }
 
-.admin-shell.admin-red-theme {
-    --admin-button-text: #203238;
-    --admin-button-fill: #f54927;
-    --admin-button-fill-hover: #d83d20;
-}
-
-.admin-shell.admin-red-theme > .admin-header .eyebrow {
-    color: var(--admin-button-fill);
-}
-
-.admin-shell.admin-red-theme .add-user-button,
-.admin-shell.admin-red-theme .report-launch-button,
-.admin-shell.admin-red-theme .refresh-button,
-.admin-shell.admin-red-theme .admin-form button:not(.secondary):not(.searchable-select-toggle),
-.admin-shell.admin-red-theme .modal-actions button:not(.secondary):not(.danger),
-.admin-shell.admin-red-theme .employee-search-controls button,
-.admin-shell.admin-red-theme .workshop-actions button:not(.secondary),
-.admin-shell.admin-red-theme .workshop-modal button[type='submit'],
-.admin-shell.admin-red-theme .form-actions button:not(.secondary):not(.danger),
-.admin-shell.admin-red-theme .report-actions button:not(.secondary),
-.admin-shell.admin-red-theme .import-actions .primary,
-.admin-shell.admin-red-theme .import-file-button {
-    border-color: var(--admin-button-fill) !important;
-    background-color: var(--admin-button-fill) !important;
-}
-
-.admin-shell.admin-red-theme .add-user-button:hover,
-.admin-shell.admin-red-theme .report-launch-button:hover,
-.admin-shell.admin-red-theme .refresh-button:hover:not(:disabled),
-.admin-shell.admin-red-theme .admin-form button:not(.secondary):not(.searchable-select-toggle):hover:not(:disabled),
-.admin-shell.admin-red-theme .modal-actions button:not(.secondary):not(.danger):hover:not(:disabled),
-.admin-shell.admin-red-theme .employee-search-controls button:hover:not(:disabled),
-.admin-shell.admin-red-theme .workshop-actions button:not(.secondary):hover:not(:disabled),
-.admin-shell.admin-red-theme .workshop-modal button[type='submit']:hover:not(:disabled),
-.admin-shell.admin-red-theme .form-actions button:not(.secondary):not(.danger):hover:not(:disabled),
-.admin-shell.admin-red-theme .report-actions button:not(.secondary):hover:not(:disabled),
-.admin-shell.admin-red-theme .import-actions .primary:hover:not(:disabled) {
-    border-color: var(--admin-button-fill-hover) !important;
-    background-color: var(--admin-button-fill-hover) !important;
-}
-
-.admin-shell.admin-red-theme .logout-button,
-.admin-shell.admin-red-theme .secondary,
-.admin-shell.admin-red-theme .reset-password-button,
-.admin-shell.admin-red-theme .catalog-search-button,
-.admin-shell.admin-red-theme .pagination button:not(.active):not(:hover),
-.admin-shell.admin-red-theme .catalog-page-buttons button:not(.active),
-.admin-shell.admin-red-theme .admin-page-buttons button:not(.active),
-.admin-shell.admin-red-theme .confirm-inline button,
-.admin-shell.admin-red-theme .catalog-field-actions .secondary,
-.admin-shell.admin-red-theme .catalog-row-actions .secondary,
-.admin-shell.admin-red-theme .report-actions button.secondary {
-    color: var(--admin-button-text) !important;
-}
-
-.admin-shell.admin-red-theme .danger,
-.admin-shell.admin-red-theme .modal-danger,
-.admin-shell.admin-red-theme .modal-close,
-.admin-shell.admin-red-theme .catalog-sort,
-.admin-shell.admin-red-theme .searchable-select-toggle {
-    color: var(--admin-button-text) !important;
-}
-
-.admin-shell.admin-red-theme .catalog-row-actions button.secondary {
-    border-color: #aac9c1 !important;
-    color: #23615e !important;
-    background-color: #fff !important;
-}
-
-.admin-shell.admin-red-theme .catalog-row-actions button.danger {
-    border-color: #e4b9b4 !important;
-    color: #a23f38 !important;
-    background-color: #fff !important;
-}
-
-.admin-shell.admin-red-theme .admin-tabs button:hover,
-.admin-shell.admin-red-theme .inventory-tabs button.active,
-.admin-shell.admin-red-theme .catalog-tabs button:hover,
-.admin-shell.admin-red-theme .catalog-tabs button.active {
-    color: var(--admin-button-text) !important;
-}
-
 /* La pestaña activa del panel usa el mismo relleno que los botones principales del tema. */
-.admin-shell.admin-red-theme .admin-tabs button.active {
-    color: #fff !important;
-    background: var(--admin-button-fill) !important;
-    box-shadow: 0 4px 10px rgba(245, 73, 39, .22);
-}
 
 /* Animación de entrada compartida por todas las ventanas emergentes (todas las pantallas). */
 @keyframes modalBackdropIn {
@@ -597,402 +122,6 @@ button:focus-visible {
 
 .modal-backdrop>* {
     animation: modalPanelIn .25s cubic-bezier(.16, 1, .3, 1);
-}
-
-.modal-backdrop .edit-modal.user-edit-modal {
-    width: min(960px, 100%);
-    overflow-y: auto;
-}
-
-.user-edit-modal .modal-form.user-editor-form {
-    grid-template-columns: minmax(0, 1.1fr) minmax(290px, .9fr);
-    align-items: start;
-    gap: 1rem;
-}
-
-.user-edit-modal .user-editor-fields {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: start;
-    gap: .85rem;
-    min-width: 0;
-}
-
-.user-edit-modal .user-editor-fields .user-field {
-    min-width: 0;
-}
-
-.user-edit-modal .user-module-access {
-    display: grid;
-    grid-column: 2;
-    grid-row: 1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    align-content: start;
-    gap: .35rem .55rem;
-    min-width: 0;
-    margin: 0;
-    padding: .8rem;
-    border: 1px solid #d7e2df;
-    border-radius: 6px;
-    background: #f8fbfa;
-}
-
-.user-edit-modal .user-module-access legend {
-    padding: 0 .35rem;
-    color: #294649;
-    font-size: .82rem;
-    font-weight: 700;
-}
-
-.user-edit-modal .user-module-option {
-    display: flex;
-    align-items: flex-start;
-    gap: .5rem;
-    min-width: 0;
-    min-height: 2.35rem;
-    padding: .45rem .4rem;
-    border-radius: 4px;
-    color: #294649;
-    background: #fff;
-    cursor: pointer;
-    font-size: .78rem;
-    line-height: 1.3;
-}
-
-.user-edit-modal .user-module-option input {
-    flex: 0 0 1rem;
-    width: 1rem;
-    height: 1rem;
-    margin: .05rem 0 0;
-    padding: 0;
-    accent-color: #276968;
-}
-
-.user-edit-modal .user-module-option span {
-    min-width: 0;
-    overflow-wrap: anywhere;
-}
-
-.user-edit-modal .user-superadmin-option,
-.user-edit-modal .user-access-note {
-    grid-column: 1 / -1;
-}
-
-.user-edit-modal .user-superadmin-option {
-    margin-top: .2rem;
-    border-top: 1px solid #e4ece9;
-    padding-top: .65rem;
-}
-
-.user-edit-modal .user-access-note {
-    margin: 0;
-    color: #718080;
-    font-size: .72rem;
-}
-
-@media (max-width: 620px) {
-    .user-edit-modal .modal-form.user-editor-form {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .user-edit-modal .user-module-access {
-        grid-column: 1;
-        grid-row: auto;
-    }
-}
-
-@media (max-width: 460px) {
-    .user-edit-modal .user-editor-fields,
-    .user-edit-modal .user-module-access {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .user-edit-modal .user-superadmin-option,
-    .user-edit-modal .user-access-note {
-        grid-column: 1;
-    }
-}
-
-.catalog-management .location-filter {
-    display: grid;
-    grid-template-columns: minmax(0, 22rem) minmax(0, 1fr);
-    align-items: end;
-    justify-content: space-between;
-    gap: 1rem;
-    width: 100%;
-    color: #294649;
-    font-size: .8rem;
-    font-weight: 700;
-}
-
-.catalog-management .location-filter-select {
-    display: grid;
-    gap: .35rem;
-    min-width: 0;
-}
-
-.catalog-management .location-filter-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: .35rem;
-    min-width: 0;
-}
-
-.catalog-management .location-clear-selection {
-    min-height: 44px;
-    padding: .55rem .8rem;
-    border: 1px solid #b9d1ca;
-    border-radius: 5px;
-    color: #276968;
-    background: #fff;
-    cursor: pointer;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.catalog-management .location-clear-selection:hover:not(:disabled) {
-    background: #e8f2ee;
-}
-
-.catalog-management .location-clear-selection:disabled {
-    cursor: not-allowed;
-    opacity: .5;
-}
-
-.catalog-management .catalog-regional-action {
-    justify-self: end;
-}
-
-.catalog-management .location-catalogs {
-    display: grid;
-    gap: 1.4rem;
-}
-
-.catalog-management .location-section {
-    display: grid;
-    gap: .65rem;
-    min-width: 0;
-    padding-top: 1rem;
-    border-top: 1px solid var(--catalog-line);
-}
-
-.catalog-management .location-section-heading {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-
-.catalog-management .location-section-heading h2 {
-    margin: 0;
-    color: #18383b;
-    font-size: 1.05rem;
-}
-
-.catalog-management .location-section-heading p {
-    margin: .2rem 0 0;
-    color: #718080;
-    font-size: .78rem;
-}
-
-.catalog-management .location-section .table-wrap {
-    min-width: 0;
-}
-
-.catalog-management .location-selector {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: center;
-    gap: .65rem;
-    width: 100%;
-    max-width: none;
-}
-
-.catalog-management .location-selector select {
-    min-height: 2.7rem;
-}
-
-.catalog-management .location-selector .catalog-row-actions {
-    flex-wrap: nowrap;
-}
-
-.catalog-management .location-empty {
-    margin: 0;
-    color: #718080;
-    font-size: .82rem;
-}
-
-.catalog-management .location-section .selected-row td {
-    background: #e8f2ef;
-}
-
-.catalog-management .location-select-button {
-    white-space: nowrap;
-}
-
-@media (max-width: 640px) {
-    .catalog-management .location-section-heading {
-        align-items: flex-start;
-        flex-direction: column;
-    }
-
-    .catalog-management .location-selector {
-        grid-template-columns: minmax(0, 1fr);
-    }
-
-    .catalog-management .location-selector .catalog-row-actions {
-        flex-wrap: wrap;
-    }
-}
-
-.location-search-backdrop {
-    position: fixed;
-    z-index: 90;
-    inset: 0;
-    display: grid;
-    place-items: center;
-    padding: 1.25rem;
-    background: rgba(12, 38, 39, .52);
-}
-
-.location-search-dialog {
-    display: flex;
-    flex-direction: column;
-    width: min(900px, 100%);
-    max-height: min(88dvh, 850px);
-    overflow: hidden;
-    padding: 1.5rem;
-    border: 1px solid #d8e4e0;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 24px 60px rgba(12, 38, 39, .3);
-}
-
-.location-search-heading {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1.25rem;
-}
-
-.location-search-heading h2 {
-    margin: 0;
-    color: #18383b;
-    font-size: 1.35rem;
-}
-
-.location-search-close {
-    width: 34px;
-    height: 34px;
-    border: 1px solid #d8e4e0;
-    border-radius: 5px;
-    color: #617573;
-    background: #fff;
-    cursor: pointer;
-    font-size: 1.35rem;
-}
-
-.location-search-form label {
-    display: block;
-    margin-bottom: .4rem;
-    color: #294649;
-    font-size: .78rem;
-    font-weight: 700;
-}
-
-.location-search-controls {
-    display: flex;
-    gap: .6rem;
-}
-
-.location-search-controls input {
-    flex: 1;
-    min-width: 0;
-    padding: .75rem .85rem;
-    border: 1px solid #d7e2df;
-    border-radius: 5px;
-}
-
-.location-search-controls button {
-    padding: .7rem 1rem;
-    border: 0;
-    border-radius: 5px;
-    color: #fff;
-    background: #276968;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.location-search-message {
-    margin: .8rem 0 0;
-    color: #718080;
-    font-size: .83rem;
-}
-
-.location-search-message.error {
-    color: #9b3f38;
-}
-
-.location-search-results {
-    display: grid;
-    gap: .55rem;
-    min-height: 0;
-    overflow-y: auto;
-    margin-top: 1rem;
-}
-
-.location-search-result {
-    display: grid;
-    gap: .2rem;
-    padding: .8rem .9rem;
-    border: 1px solid #d8e4e0;
-    border-radius: 5px;
-    color: #203238;
-    background: #fbfdfc;
-    cursor: pointer;
-    text-align: left;
-}
-
-.location-search-result:hover {
-    border-color: #9ebeb5;
-    background: #edf4f2;
-}
-
-.location-result-type {
-    color: #397b78;
-    font-size: .68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.location-search-result strong {
-    color: #18383b;
-    font-size: .9rem;
-}
-
-.location-search-result small {
-    color: #718080;
-    font-size: .76rem;
-}
-
-.location-search-trigger {
-    display: grid;
-    place-items: center;
-    width: 44px;
-    height: 44px;
-    padding: 0;
-    border: 1px solid #b9d1ca;
-    border-radius: 5px;
-    color: #276968;
-    background: #fff;
-    cursor: pointer;
-    font-size: 1.35rem;
-}
-
-.location-search-trigger:hover {
-    background: #e8f2ee;
 }
 
 .searchable-select {
@@ -1111,29 +240,6 @@ button:focus-visible {
     color: #718080;
     font-size: .82rem;
 }
-
-@media (max-width: 560px) {
-    .catalog-management .location-filter {
-        grid-template-columns: minmax(0, 1fr);
-        gap: .65rem;
-    }
-
-    .catalog-management .location-filter-actions {
-        justify-self: end;
-    }
-
-    .location-search-backdrop {
-        padding: .65rem;
-    }
-
-    .location-search-dialog {
-        padding: 1rem;
-    }
-
-    .location-search-controls {
-        flex-direction: column;
-    }
-}
 /* ------------------------------------------------------------------
    Estructura común de los paneles (todas las pantallas):
    título de la página, pestañas de sección, tarjetas y mensajes.
@@ -1151,49 +257,8 @@ button:focus-visible {
     line-height: 1.15;
 }
 
-.admin-tabs,
-.inventory-tabs {
-    display: flex;
-    gap: .3rem;
-    width: fit-content;
-    max-width: 100%;
-    padding: .3rem;
-    overflow-x: auto;
-    border: 1px solid #d8e4e0;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(23, 63, 67, .05);
-}
-
-.admin-tabs button,
-.inventory-tabs button {
-    flex: none;
-    padding: .6rem 1.1rem;
-    border: 0;
-    border-radius: 7px;
-    color: #617573;
-    background: transparent;
-    cursor: pointer;
-    font-weight: 700;
-    white-space: nowrap;
-}
-
-.admin-tabs button:hover,
-.inventory-tabs button:hover {
-    color: #276968;
-    background: #e8f2ee;
-}
-
-.admin-tabs button.active,
-.inventory-tabs button.active {
-    color: #fff;
-    background: #276968;
-    box-shadow: 0 4px 10px rgba(39, 105, 104, .18);
-}
-
 /* Cada sección del panel se presenta como una tarjeta blanca sobre el fondo verde claro. */
-.admin-shell .admin-section,
-.inventory-shell .inventory-section,
+
 .workshop-shell .workshop-section {
     padding: clamp(1rem, 2vw, 1.5rem);
     border: 1px solid #dfe9e5;
@@ -1202,86 +267,23 @@ button:focus-visible {
     box-shadow: 0 1px 3px rgba(23, 63, 67, .05), 0 10px 28px rgba(23, 63, 67, .04);
 }
 
-.admin-shell .feedback,
-.inventory-shell .feedback,
 .workshop-shell .feedback {
     border-left: 4px solid currentColor;
     border-radius: 6px;
 }
 
-@media (max-width: 640px) {
-    .admin-tabs,
-    .inventory-tabs {
-        width: 100%;
-    }
-}
-
-/* Diálogo de edición de dispositivo: No. de pago tomado del empleado y responsable actual. */
-.admin-shell .readonly-field,
-.workshop-shell .readonly-field {
-    color: #31504d;
-    background: #f2f7f5;
-    cursor: default;
-}
-
-.admin-shell .current-assignment {
-    grid-column: 1 / -1;
-    margin: 0;
-    padding: .6rem .8rem;
-    border-radius: 6px;
-    color: #344b4b;
-    background: #edf4f1;
-    font-size: .8rem;
-}
-
-/* Alcance de la edición de una pieza de combo. */
-.admin-shell .combo-edit-scope {
-    display: grid;
-    grid-column: 1 / -1;
-    gap: .3rem;
-    padding: .7rem .85rem;
-    border: 1px solid #d5e1dd;
-    border-radius: 6px;
-    background: #f8fbfa;
-}
-
-.admin-shell .combo-edit-scope label {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    color: #294649;
-    font-size: .84rem;
-    font-weight: 700;
-    cursor: pointer;
-}
-
-.admin-shell .combo-edit-scope input {
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    padding: 0;
-    accent-color: #276968;
-}
-
-.admin-shell .combo-edit-scope small {
-    color: #617573;
-    font-size: .76rem;
-}
-
 /* ------------------------------------------------------------------
-   Estilo unificado de tablas, filtros y botones en todos los módulos
-   (Admin, Inventario, Taller, catálogos, importación y reportes).
-   Solo define forma, espaciado y sombras: los colores siguen viniendo
-   de cada componente y del tema rojo del panel Admin.
+   Estilo común de tablas y botones del panel. Solo define forma,
+   espaciado y sombras: los colores vienen de cada componente.
    ------------------------------------------------------------------ */
-:is(.admin-shell, .inventory-shell, .workshop-shell) {
+.workshop-shell {
     --ui-radius: 8px;
     --ui-line: #e3ece9;
     --ui-head: #f6f9f8;
 }
 
 /* Tablas: contenedor con borde redondeado, encabezado gris en mayúsculas y filas separadas. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) {
+.workshop-shell .table-wrap {
     overflow-x: auto;
     border: 1px solid #d5e1dd;
     border-radius: 10px;
@@ -1289,13 +291,13 @@ button:focus-visible {
     box-shadow: 0 1px 2px rgba(23, 63, 67, .04);
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) table {
+.workshop-shell .table-wrap table {
     border-collapse: collapse;
     color: #243a40;
     font-size: .78rem;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) th {
+.workshop-shell .table-wrap th {
     padding: .85rem .75rem;
     border-bottom: 1px solid #dfe9e5;
     color: #617573;
@@ -1308,82 +310,47 @@ button:focus-visible {
     white-space: nowrap;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) td {
+.workshop-shell .table-wrap td {
     padding: .8rem .75rem;
     border-bottom: 1px solid var(--ui-line);
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) tbody tr:last-child td {
+.workshop-shell .table-wrap tbody tr:last-child td {
     border-bottom: 0;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) tbody tr {
+.workshop-shell .table-wrap tbody tr {
     transition: background .15s ease;
 }
 
-/* Mismo patrón que la tabla de combos: filas alternas en verde claro y la primera
-   columna (identificador del registro) resaltada. La tabla de combos ya alterna por grupo. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) table:not(.combo-inventory-table) tbody tr:nth-child(even) > td {
+/* Filas alternas en verde claro y la primera columna (identificador del registro) resaltada.
+   Los :not() conservan la especificidad con la que se definieron estas reglas. */
+.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:nth-child(even) > td {
     background: #f1f7ed;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) table:not(.combo-inventory-table) tbody tr > td:first-child {
+.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr > td:first-child {
     color: #18383b;
     background: #eaf4e4;
     font-weight: 700;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) table:not(.combo-inventory-table) tbody tr:nth-child(even) > td:first-child {
+.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:nth-child(even) > td:first-child {
     background: #e4f1dc;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) tbody tr:hover > td:not(.combo-shared-cell) {
+.workshop-shell .table-wrap tbody tr:hover > td:not(.combo-shared-cell) {
     background: #e8f2ef;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) table:not(.combo-inventory-table) tbody tr:hover > td:first-child {
+.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:hover > td:first-child {
     background: #dcecd4;
 }
 
-/* Filtros: mismos campos redondeados en todas las barras de búsqueda. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.filter-bar, .report-filter-grid, .catalog-selector-grid, .location-filter, .admin-table-toolbar) :is(input, select, .searchable-select-input) {
-    min-height: 2.65rem;
-    border: 1px solid #d3dfdb;
-    border-radius: var(--ui-radius);
-    background-color: #fff;
-    box-shadow: 0 1px 2px rgba(23, 63, 67, .03);
-    transition: border-color .15s ease, box-shadow .15s ease;
-}
-
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.filter-bar, .report-filter-grid, .catalog-selector-grid, .location-filter, .admin-table-toolbar) :is(input, select, .searchable-select-input):hover:not(:disabled) {
-    border-color: #b9d1ca;
-}
-
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.filter-bar, .report-filter-grid, .catalog-selector-grid, .location-filter, .admin-table-toolbar) :is(input, select, .searchable-select-input):focus {
-    border-color: #397b78;
-    box-shadow: 0 0 0 3px rgba(57, 123, 120, .14);
-}
-
 /* Botones principales: esquinas redondeadas, peso medio y sombra suave que se eleva al pasar el cursor. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) button:is(
-    .add-user-button,
-    .report-launch-button,
-    .report-export,
-    .import-file-button,
-    .primary,
-    .modal-danger
-),
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(
-    .admin-form,
-    .inventory-form,
-    .modal-actions,
-    .form-actions,
-    .workshop-actions,
-    .import-actions,
-    .location-search-controls,
-    .employee-search-controls
-) button:not(.secondary):not(.danger):not(.searchable-select-toggle),
-:is(.admin-shell, .inventory-shell, .workshop-shell) .workshop-modal button[type='submit'] {
+
+.workshop-shell .workshop-actions button:not(.secondary):not(.danger):not(.searchable-select-toggle),
+.workshop-shell .workshop-modal button[type='submit'] {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -1395,48 +362,31 @@ button:focus-visible {
     box-shadow: 0 1px 2px rgba(16, 40, 42, .1), 0 4px 12px rgba(39, 105, 104, .14);
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) button:is(
-    .add-user-button,
-    .report-launch-button,
-    .report-export,
-    .import-file-button,
-    .primary,
-    .modal-danger
-):hover:not(:disabled),
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(
-    .admin-form,
-    .inventory-form,
-    .modal-actions,
-    .form-actions,
-    .workshop-actions,
-    .import-actions,
-    .location-search-controls,
-    .employee-search-controls
-) button:not(.secondary):not(.danger):not(.searchable-select-toggle):hover:not(:disabled),
-:is(.admin-shell, .inventory-shell, .workshop-shell) .workshop-modal button[type='submit']:hover:not(:disabled) {
+.workshop-shell .workshop-actions button:not(.secondary):not(.danger):not(.searchable-select-toggle):hover:not(:disabled),
+.workshop-shell .workshop-modal button[type='submit']:hover:not(:disabled) {
     box-shadow: 0 2px 4px rgba(16, 40, 42, .1), 0 8px 20px rgba(39, 105, 104, .2);
     transform: translateY(-1px);
 }
 
 /* Botones secundarios y de peligro fuera de las tablas: contorno suave. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) button:is(.secondary, .danger, .logout-button, .catalog-search-button, .location-clear-selection, .location-search-trigger) {
+.workshop-shell button:is(.secondary, .danger, .logout-button) {
     border-radius: var(--ui-radius) !important;
     font-weight: 600;
     box-shadow: 0 1px 2px rgba(16, 40, 42, .06);
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) button:is(.secondary, .catalog-search-button, .location-clear-selection, .location-search-trigger):hover:not(:disabled) {
+.workshop-shell button:is(.secondary):hover:not(:disabled) {
     border-color: #8fb5ab;
     box-shadow: 0 3px 10px rgba(39, 105, 104, .12);
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) button.danger:hover:not(:disabled) {
+.workshop-shell button.danger:hover:not(:disabled) {
     border-color: #d99b93;
     box-shadow: 0 3px 10px rgba(155, 63, 56, .12);
 }
 
 /* Acciones dentro de las tablas (Editar, Quitar, etc.): compactas y del mismo tamaño. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) td button:not(.reset-password-button) {
+.workshop-shell .table-wrap td button:not(.reset-password-button) {
     min-height: 1.95rem;
     padding: .35rem .75rem;
     border-radius: 6px !important;
@@ -1445,184 +395,15 @@ button:focus-visible {
     box-shadow: none;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.table-wrap, .import-table-wrap) td button:not(.reset-password-button):hover:not(:disabled) {
+.workshop-shell .table-wrap td button:not(.reset-password-button):hover:not(:disabled) {
     box-shadow: 0 2px 8px rgba(23, 63, 67, .1);
     transform: translateY(-1px);
 }
 
-/* Paginación y botón de refrescar con la misma forma redondeada. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.pagination, .admin-page-buttons, .catalog-page-buttons) button,
+/* Botón de refrescar con la misma forma redondeada. */
+
 .refresh-button {
     border-radius: var(--ui-radius) !important;
     font-weight: 600;
 }
 
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.pagination, .admin-page-buttons, .catalog-page-buttons) button:hover:not(:disabled):not(.active) {
-    border-color: #8fb5ab;
-}
-
-/* Botón de cierre de los diálogos. */
-:is(.admin-shell, .inventory-shell, .workshop-shell) :is(.report-close, .location-search-close) {
-    border-radius: var(--ui-radius);
-}
-
-/* ------------------------------------------------------------------
-   Formularios de dispositivos y reasignaciones más compactos.
-   ------------------------------------------------------------------ */
-.admin-shell .edit-modal,
-.inventory-shell .edit-modal {
-    padding: 1.1rem 1.25rem;
-}
-
-.admin-shell .edit-modal .modal-heading,
-.inventory-shell .edit-modal .modal-heading {
-    margin-bottom: .75rem;
-}
-
-.admin-shell .edit-modal .modal-form,
-.admin-shell .modal-form.device-create-form,
-.inventory-shell .edit-modal .modal-form {
-    gap: .55rem .8rem;
-}
-
-.admin-shell .device-create-identification,
-.admin-shell .device-create-assignment-location,
-.admin-shell .device-create-employee-fields {
-    gap: .55rem .8rem;
-}
-
-.admin-shell .device-create-field {
-    gap: .25rem;
-}
-
-.admin-shell .edit-modal input,
-.admin-shell .edit-modal select,
-.inventory-shell .edit-modal input,
-.inventory-shell .edit-modal select {
-    min-height: 2.3rem;
-    padding: .45rem .65rem;
-}
-
-.admin-shell .desktop-combo-component {
-    gap: .5rem;
-    padding: .75rem;
-}
-
-/* Reasignación: el No. de pago ocupa solo lo necesario para 5 dígitos. */
-:is(.admin-shell, .inventory-shell) .reassignment-location-fields.reassignment-person-fields {
-    grid-template-columns: minmax(0, 1fr) minmax(7rem, 9rem);
-}
-
-:is(.admin-shell, .inventory-shell) .reassignment-person-fields > div {
-    display: grid;
-    gap: .25rem;
-    min-width: 0;
-}
-
-/* Buscador de la tabla de reasignaciones junto al selector "Mostrar N registros". */
-.reassignment-table-toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: .6rem 1rem;
-    margin-bottom: .6rem;
-}
-
-.reassignment-table-toolbar app-table-page-size {
-    margin-bottom: 0;
-}
-
-:is(.admin-shell, .inventory-shell) .reassignment-search {
-    width: min(26rem, 100%);
-    min-height: 2.4rem;
-    padding: .45rem .75rem;
-    border: 1px solid #d3dfdb;
-    border-radius: 8px;
-}
-
-/* Tablas con muchas columnas: el ancho de cada una se ajusta a su contenido. */
-:is(.admin-shell, .inventory-shell) :is(.table-wrap) table.reassignment-table,
-:is(.admin-shell, .inventory-shell) :is(.table-wrap) table.device-list-table {
-    min-width: 1150px;
-    table-layout: auto;
-}
-
-:is(.admin-shell, .inventory-shell) :is(.table-wrap) table.reassignment-table :is(th, td) {
-    padding: .55rem .6rem;
-}
-
-:is(.admin-shell, .inventory-shell) table.reassignment-table td:nth-child(-n + 5),
-:is(.admin-shell, .inventory-shell) table.reassignment-table td:nth-child(9) {
-    white-space: nowrap;
-}
-
-:is(.admin-shell, .inventory-shell) table.reassignment-table td:nth-child(10) {
-    min-width: 12rem;
-}
-
-/* Etiquetas del diálogo de edición del panel Inventario, igual que en Agregar dispositivo. */
-.inventory-shell .form-field-label {
-    display: grid;
-    gap: .25rem;
-    min-width: 0;
-    color: #294649;
-    font-size: .76rem;
-    font-weight: 700;
-}
-
-.inventory-shell .form-field-label :is(input, select) {
-    width: 100%;
-    font-size: .9rem;
-    font-weight: 400;
-}
-
-/* Columna Acción de reasignaciones: el botón "Reasignar" se muestra completo en una línea. */
-:is(.admin-shell, .inventory-shell) table.reassignment-table td:last-child {
-    width: 1%;
-    white-space: nowrap;
-}
-
-:is(.admin-shell, .inventory-shell) table.reassignment-table td:last-child button {
-    white-space: nowrap;
-    overflow-wrap: normal;
-    word-break: keep-all;
-}
-
-/* Buscador de empleado al inicio del formulario de dispositivos: ocupa toda la fila. */
-.device-employee-lookup {
-    grid-column: 1 / -1;
-    margin-bottom: .25rem;
-}
-
-/* En Reasignaciones va en la tercera columna, junto a la búsqueda del equipo, y solo del ancho del texto. */
-.reassignment-employee-lookup {
-    justify-self: start;
-}
-
-.reassignment-employee-lookup .employee-lookup-trigger {
-    width: auto;
-    min-height: 2.4rem;
-    padding-inline: 1rem;
-}
-
-/* Agregar dispositivo (Asignado): el buscador de empleado ocupa el resto de la fila de Estado. */
-.device-create-lookup {
-    grid-column: 2 / -1;
-    align-self: end;
-}
-
-@media (max-width: 760px) {
-    .device-create-lookup {
-        grid-column: 1 / -1;
-    }
-}
-
-/* Campos obligatorios sin llenar al intentar guardar (directiva appHighlightInvalid).
-   Las listas con buscador ocultan el <select>: se sombrea su campo de búsqueda. */
-form.show-invalid :is(input, select, textarea).ng-invalid:not(:disabled),
-form.show-invalid .searchable-select:has(> select.ng-invalid:not(:disabled)) .searchable-select-input {
-    border-color: #e57373 !important;
-    background-color: #fff6f6 !important;
-    box-shadow: 0 0 0 3px rgba(229, 115, 115, .12) !important;
-}
