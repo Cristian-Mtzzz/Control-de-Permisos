@@ -1,0 +1,117 @@
+<!-- Personal de cada área: a quién se le pueden registrar permisos. -->
+@if (message) { <p class="feedback success" role="status">{{ message }}</p> }
+@if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+
+@if (!administra) {
+<!-- Jefe: su gente y los empleados de su departamento que todavía no tienen área. -->
+<section class="workshop-section">
+  <div class="workshop-actions">
+    <div>
+      <p class="eyebrow">ÁREA DE {{ sesion().NombreArea?.toUpperCase() }}</p>
+      <h2>Mi personal · {{ miPersonal.length }}</h2>
+    </div>
+  </div>
+
+  <form class="personal-add" (ngSubmit)="agregar()">
+    <div class="personal-add-field">
+      <label for="personal-nuevo">Agregar empleado a mi área</label>
+      <select id="personal-nuevo" [(ngModel)]="nuevoEmpleadoId" name="personalNuevo">
+        <option [ngValue]="0">Selecciona un empleado sin área</option>
+        @for (empleado of disponibles; track empleado.IdEmpleado) {
+        <option [ngValue]="empleado.IdEmpleado">{{ empleado.NombreCompleto }}</option>
+        }
+      </select>
+    </div>
+    <button type="submit" [disabled]="isSaving || nuevoEmpleadoId === 0">Agregar</button>
+  </form>
+  <p class="field-hint">
+    Solo aparecen los empleados activos de tu departamento que todavía no pertenecen a ningún área. Si
+    alguien está en otra área, el administrador de tu departamento puede moverlo.
+  </p>
+
+  <div class="table-wrap">
+    <table class="resumen-table">
+      <thead>
+        <tr>
+          <th>EMPLEADO</th>
+          <th>NO. DE PAGO</th>
+          <th>ACCIONES</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (empleado of miPersonal; track empleado.IdEmpleado) {
+        <tr>
+          <td>{{ empleado.NombreCompleto }}</td>
+          <td>{{ empleado.NoPago || '-' }}</td>
+          <td><button type="button" class="danger" (click)="quitar(empleado)" [disabled]="isSaving">Quitar del área</button></td>
+        </tr>
+        } @empty {
+        <tr><td colspan="3" class="empty">Todavía no tienes personal asignado. Agrégalo con el selector de arriba.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+</section>
+} @else {
+<!-- Administradores: los empleados activos de su alcance con su área; se cambian desde la tabla. -->
+<section class="workshop-section">
+  <div class="workshop-actions">
+    <div>
+      <p class="eyebrow">{{ sesion().Nivel === 'ADMIN_DEPTO' ? sesion().NombreDepartamento?.toUpperCase() : 'PERSONAL' }}</p>
+      <h2>Empleados por área</h2>
+    </div>
+  </div>
+
+  <div class="permisos-filters">
+    <input type="search" class="permisos-search" [(ngModel)]="searchTerm" (ngModelChange)="updateFilter()"
+      name="personalSearch" placeholder="Buscar por nombre o No. de pago" aria-label="Buscar empleados" />
+    @if (variosDepartamentos) {
+    <select nativeSelect [(ngModel)]="deptoFilter" (ngModelChange)="updateDepto()" name="personalDepto" aria-label="Departamento">
+      <option [ngValue]="0">Todos los departamentos</option>
+      @for (departamento of sesion().Departamentos; track departamento.IdDepartamento) {
+      <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
+      }
+    </select>
+    }
+    <select nativeSelect [(ngModel)]="areaFilter" (ngModelChange)="updateFilter()" name="personalArea" aria-label="Área">
+      <option [ngValue]="0">Todas las áreas</option>
+      <option [ngValue]="sinArea">Sin área</option>
+      @for (area of areasFiltro; track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
+    </select>
+    <app-table-page-size [(page)]="page" [(pageSize)]="pageSize" />
+  </div>
+
+  <div class="table-wrap">
+    <table class="resumen-table">
+      <thead>
+        <tr>
+          <th>EMPLEADO</th>
+          <th>NO. DE PAGO</th>
+          @if (variosDepartamentos) { <th>DEPARTAMENTO</th> }
+          <th>ÁREA</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (empleado of filtrados | page: page : pageSize; track empleado.IdEmpleado) {
+        <tr>
+          <td>{{ empleado.NombreCompleto }}</td>
+          <td>{{ empleado.NoPago || '-' }}</td>
+          @if (variosDepartamentos) { <td>{{ departamentoNombre(empleado.IdDepartamento) }}</td> }
+          <td>
+            <select nativeSelect class="row-select" [ngModel]="empleado.IdArea ?? 0"
+              (ngModelChange)="cambiarArea(empleado, $event)" [disabled]="isSaving"
+              [attr.aria-label]="'Área de ' + empleado.NombreCompleto">
+              <option [ngValue]="0">Sin área</option>
+              @for (area of areasDe(empleado); track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
+            </select>
+          </td>
+        </tr>
+        } @empty {
+        <tr><td [attr.colspan]="variosDepartamentos ? 4 : 3" class="empty">No hay empleados que coincidan.</td></tr>
+        }
+      </tbody>
+    </table>
+  </div>
+  <app-table-paginator [total]="filtrados.length" [(page)]="page" [pageSize]="pageSize" label="Paginación de empleados" />
+</section>
+}

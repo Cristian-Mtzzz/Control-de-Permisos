@@ -1,0 +1,43 @@
+<!-- Pantalla pública del login. -->
+<main class="auth-shell">
+  <header class="app-header">
+    <!-- Logo del ihss. -->
+    <img class="brand-logo" src="logo.png" alt="Gobierno de la República de Honduras · IHSS" />
+    <span class="header-title">Control de Permisos</span>
+  </header>
+  
+  <section class="form-panel">
+    <div class="form-wrap">
+      <p class="eyebrow">BIENVENIDO</p>
+      <h2>Inicia sesion</h2>
+      <p class="form-intro">Ingresa con tu usuario del sistema o de dominio.</p>
+
+      <form [formGroup]="loginForm" (ngSubmit)="submitLogin()" novalidate>
+        <label for="userName">Usuario</label>
+        <input id="userName" type="text" formControlName="userName" autocomplete="username"
+          placeholder="Tu nombre de usuario" />
+        @if (loginForm.controls.userName.touched && loginForm.controls.userName.invalid) { <small
+          class="field-error">Ingresa tu nombre de usuario.</small> }
+        <label for="password">Contrasena</label>
+
+        <div class="password-field">
+          <input id="password" [type]="showPassword ? 'text' : 'password'" formControlName="password"
+            autocomplete="current-password" placeholder="Tu contrasena" />
+          <button type="button" class="password-toggle" (click)="showPassword = !showPassword"
+            [attr.aria-label]="showPassword ? 'Ocultar contrasena' : 'Mostrar contrasena'">{{ showPassword ? 'Ocultar' :
+            'Ver' }}</button>
+        </div>
+
+        @if (loginForm.controls.password.touched && loginForm.controls.password.invalid) { <small
+          class="field-error">Ingresa tu contraseña.</small> }
+        @if (infoMessage()) { <p class="info-banner" role="status">{{ infoMessage() }}</p> }
+        @if (errorMessage()) { <p class="error-banner" role="alert">{{ errorMessage() }}</p> }
+        <button class="submit-button" type="submit" [disabled]="isLoading()"><span>{{ isLoading() ? 'Validando...' :
+            'Ingresar' }}</span>@if (!isLoading()) { <span class="submit-arrow" aria-hidden="true">&rarr;</span>
+          }</button>
+      </form>
+      <p class="security-note"><span aria-hidden="true">&#9672;</span> Conexion segura y protegida</p>
+    </div>
+    <footer>© 2026 Control de Permisos <span>·</span> Acceso autorizado</footer>
+  </section>
+</main>

@@ -1,0 +1,17 @@
+{
+  "/api": {
+    "target": "http://localhost:5080",
+    "secure": false,
+    "changeOrigin": true,
+    "logLevel": "debug"
+  },
+  "/ApiControlPermisos/api": {
+    "target": "http://localhost:5080",
+    "secure": false,
+    "changeOrigin": true,
+    "pathRewrite": {
+      "^/ApiControlPermisos/api": "/api"
+    },
+    "logLevel": "debug"
+  }
+}

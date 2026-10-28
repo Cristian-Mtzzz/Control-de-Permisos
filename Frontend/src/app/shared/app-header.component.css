@@ -1,0 +1,223 @@
+/* Barra superior fija de los paneles. Ocupa todo el ancho del panel anulando su margen
+   lateral (--shell-gutter) y toma el color de acento del tema activo (verde o rojo Admin). */
+:host {
+    --header-accent: var(--admin-button-fill, #276968);
+    --header-accent-dark: var(--admin-button-fill-hover, #1b5252);
+    position: sticky;
+    top: 0;
+    z-index: 15;
+    display: block;
+    margin: 0 calc(-1 * var(--shell-gutter, 2rem));
+}
+
+.app-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    min-height: 4.5rem;
+    padding: .7rem var(--shell-gutter, 2rem);
+    border-bottom: 1px solid #d8e4e0;
+    background: rgba(255, 255, 255, .96);
+    box-shadow: 0 2px 14px rgba(23, 63, 67, .07);
+    backdrop-filter: blur(6px);
+}
+
+/* Franja de acento superior. */
+.app-header::before {
+    position: absolute;
+    inset: 0 0 auto;
+    height: 3px;
+    background: linear-gradient(90deg, var(--header-accent), var(--header-accent-dark));
+    content: '';
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: .9rem;
+    min-width: 0;
+}
+
+.brand-logo {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 3rem;
+    height: 3rem;
+    overflow: hidden;
+    border-radius: 10px;
+}
+
+/* Con imagen, el espacio toma el ancho del logo horizontal (600x192) manteniendo su proporción. */
+.brand-logo:not(.brand-logo-placeholder) {
+    width: auto;
+    height: auto;
+    overflow: visible;
+    border-radius: 0;
+}
+
+/* La imagen fija su propio alto (sin recortes) y el ancho sale de su proporción. */
+.brand-logo img {
+    display: block;
+    width: auto;
+    height: 2.6rem;
+    max-width: min(10rem, 40vw);
+    object-fit: contain;
+}
+
+.brand-logo-placeholder {
+    border: 1px dashed #9ebeb5;
+    color: #276968;
+    background: #e8f2ee;
+}
+
+.brand-logo svg {
+    width: 1.5rem;
+    height: 1.5rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+.brand-text {
+    display: grid;
+    gap: .1rem;
+    min-width: 0;
+    padding-left: .9rem;
+    border-left: 1px solid #d8e4e0;
+    line-height: 1.2;
+}
+
+.brand-name {
+    color: #18383b;
+    font-family: 'Space Grotesk', 'Segoe UI', sans-serif;
+    font-size: 1.05rem;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.brand-module {
+    overflow: hidden;
+    color: #617573;
+    font-size: .78rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.header-end {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+    min-width: 0;
+}
+
+.header-user {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    min-width: 0;
+}
+
+.user-avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    color: #fff;
+    background: linear-gradient(135deg, var(--header-accent), var(--header-accent-dark));
+    font-size: .8rem;
+    font-weight: 800;
+    letter-spacing: .03em;
+}
+
+.user-text {
+    display: grid;
+    min-width: 0;
+    line-height: 1.25;
+}
+
+.user-text strong {
+    max-width: 16rem;
+    overflow: hidden;
+    color: #203238;
+    font-size: .85rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.user-text small {
+    color: #718080;
+    font-size: .72rem;
+}
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    padding-left: 1.25rem;
+    border-left: 1px solid #d8e4e0;
+}
+
+.header-actions button {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    white-space: nowrap;
+}
+
+.header-actions svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 2;
+}
+
+@media (max-width: 900px) {
+    .user-text {
+        display: none;
+    }
+}
+
+@media (max-width: 640px) {
+    .app-header {
+        gap: .75rem;
+    }
+
+    .brand-name {
+        font-size: .95rem;
+    }
+
+    .header-actions {
+        padding-left: 0;
+        border-left: 0;
+    }
+
+    .header-user {
+        display: none;
+    }
+
+    /* En pantallas pequeñas los botones muestran solo el ícono. */
+    .header-actions button span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+    }
+}
+
+@media (max-width: 420px) {
+    .brand-text {
+        display: none;
+    }
+}

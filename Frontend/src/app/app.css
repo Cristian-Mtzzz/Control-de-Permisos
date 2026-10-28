@@ -1,0 +1,5 @@
+/* El componente raíz ocupa todo el alto y delega el contenido al router-outlet. */
+:host {
+	display: block;
+	min-height: 100dvh;
+}

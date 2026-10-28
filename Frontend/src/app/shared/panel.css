@@ -1,0 +1,432 @@
+/* Estilos del Taller: operaciones, tabla de reparaciones y ventanas modales. */
+:host {
+    display: block;
+    min-height: 100dvh;
+    background: #f4f8f6;
+    color: #203238;
+}
+
+.workshop-modal.reception-page {
+    width: min(1040px, 100%);
+    max-height: none;
+    margin: 0 auto;
+    overflow: visible;
+}
+
+.paper-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .75rem 1rem;
+}
+
+.form-field {
+    display: grid;
+    gap: .4rem;
+    min-width: 0;
+}
+
+.form-field-wide,
+.form-section-title {
+    grid-column: 1 / -1;
+}
+
+.form-section-title {
+    margin: .5rem 0 0;
+    padding-bottom: .45rem;
+    border-bottom: 1px solid #d8e4e0;
+    color: #18383b;
+    font-size: .95rem;
+}
+
+.workshop-shell {
+    --shell-gutter: clamp(1rem, 2vw, 2rem);
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0 var(--shell-gutter) 2.5rem;
+}
+
+/* Dentro del panel Admin el taller usa el margen del panel contenedor. */
+.workshop-shell.embedded {
+    padding: 0;
+}
+
+.eyebrow {
+    margin: 0 0 .65rem;
+    color: #397b78;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .16em;
+}
+
+h1,
+h2 {
+    margin: 0;
+    font-family: 'Space Grotesk', sans-serif;
+}
+
+h1 {
+    color: #18383b;
+}
+
+.feedback {
+    margin: 1.5rem 0 0;
+    padding: .8rem 1rem;
+    border-radius: 4px;
+    font-size: .85rem;
+}
+
+.success {
+    color: #276968;
+    background: #dcecd8;
+}
+
+.error {
+    color: #9b3f38;
+    background: #fcece9;
+}
+
+.workshop-section {
+    display: grid;
+    gap: .9rem;
+    margin-top: 2rem;
+}
+
+.maintenance-form {
+    display: grid;
+    grid-template-columns: 1.5fr 1fr;
+    gap: .75rem;
+    align-items: end;
+    padding: 0;
+}
+
+.maintenance-form h2 {
+    grid-column: 1 / -1;
+    color: #18383b;
+    font-size: 1.1rem;
+}
+
+select,
+textarea {
+    width: 100%;
+    padding: .75rem .8rem;
+    border: 1px solid #d7e2df;
+    border-radius: 4px;
+    outline: none;
+    color: #203238;
+    background: #fff;
+    font: inherit;
+}
+
+textarea {
+    resize: vertical;
+    grid-column: 1 / -1;
+}
+
+select:focus,
+textarea:focus {
+    border-color: #397b78;
+    box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
+}
+
+.form-actions {
+    display: flex;
+    gap: .6rem;
+    grid-column: 1 / -1;
+}
+
+.form-actions button,
+.secondary {
+    padding: .75rem 1rem;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: #276968;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.form-actions .secondary,
+.secondary {
+    border: 1px solid #b9d1ca;
+    color: #276968;
+    background: #fff;
+}
+
+.table-wrap {
+    overflow: auto;
+}
+
+table {
+    width: 100%;
+    min-width: 1800px;
+    border-collapse: collapse;
+    font-size: .78rem;
+}
+
+th,
+td {
+    padding: .75rem .55rem;
+    border-bottom: 1px solid #edf2f0;
+    text-align: left;
+    vertical-align: top;
+}
+
+th {
+    color: #617573;
+    background: #f8fbfa;
+    font-size: .65rem;
+    text-transform: uppercase;
+}
+
+.empty {
+    padding: 2rem;
+    color: #718080;
+    text-align: center;
+}
+
+.status {
+    display: inline-block;
+    padding: .3rem .45rem;
+    border-radius: 4px;
+    color: #276968;
+    background: #dcecd8;
+    font-size: .7rem;
+    font-weight: 700;
+}
+
+.status.en_reparacion {
+    color: #8a5a13;
+    background: #fff1cc;
+}
+
+.status.terminado {
+    color: #28658a;
+    background: #dceefa;
+}
+
+@media (max-width: 760px) {
+    .workshop-header {
+        flex-direction: column;
+    }
+
+    .maintenance-form {
+        grid-template-columns: 1fr;
+    }
+
+    .paper-form {
+        grid-template-columns: 1fr;
+    }
+
+    .form-field-wide,
+    .form-section-title {
+        grid-column: auto;
+    }
+}
+
+.workshop-modal button:disabled,
+.workshop-actions button:disabled,
+td button:disabled {
+    cursor: not-allowed;
+    opacity: .65;
+}
+
+.danger {
+    padding: .55rem .7rem;
+    border: 1px solid #e4b9b4;
+    border-radius: 5px;
+    color: #9b3f38;
+    background: #fff;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.workshop-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0;
+}
+
+.workshop-actions-group {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    flex-wrap: wrap;
+}
+
+.workshop-actions-group button {
+    min-width: 150px;
+}
+
+/* El selector "Mostrar N registros" comparte la fila con los botones de la sección. */
+.workshop-actions-group app-table-page-size {
+    margin-bottom: 0;
+}
+
+.workshop-actions h2 {
+    color: #18383b;
+    font-size: 1.2rem;
+}
+
+.workshop-actions button {
+    padding: .75rem 1rem;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: #276968;
+    cursor: pointer;
+    font-weight: 700;
+    transition: transform .15s ease, box-shadow .15s ease, background .2s ease;
+}
+
+.workshop-actions .secondary {
+    border: 1px solid #b9d1ca;
+    color: #276968;
+    background: #fff;
+}
+
+.workshop-actions button:hover {
+    background: #1b5252;
+    transform: translateY(-1px);
+}
+
+.workshop-actions .secondary:hover {
+    background: #e8f2ee;
+    box-shadow: 0 6px 18px rgba(39, 105, 104, .08);
+}
+
+.closed {
+    color: #718080;
+    font-size: .75rem;
+}
+
+.modal-backdrop {
+    position: fixed;
+    z-index: 20;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    overflow: auto;
+    background: rgba(12, 38, 39, .48);
+}
+
+.reception-page-backdrop {
+    position: static;
+    display: block;
+    min-height: calc(100dvh - 150px);
+    padding: 1.5rem 0;
+    background: transparent;
+}
+
+.workshop-modal {
+    width: min(540px, 100%);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border: 1px solid #d8e4e0;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(12, 38, 39, .25);
+}
+
+.modal-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    margin-bottom: 1.25rem;
+}
+
+.modal-heading h2 {
+    color: #18383b;
+    font-size: 1.35rem;
+}
+
+.modal-subtitle {
+    margin: .4rem 0 0;
+    color: #718080;
+    font-size: .8rem;
+}
+
+.modal-close {
+    border: 0;
+    color: #718080;
+    background: transparent;
+    cursor: pointer;
+    font-size: 1.6rem;
+    line-height: 1;
+    transition: color .2s ease;
+}
+
+.modal-close:hover {
+    color: #18383b;
+}
+
+.workshop-modal form {
+    display: grid;
+    gap: .6rem;
+}
+
+.workshop-modal label {
+    color: #294649;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.workshop-modal textarea,
+.workshop-modal input,
+.workshop-modal select {
+    width: 100%;
+    padding: .75rem .8rem;
+    border: 1px solid #d7e2df;
+    border-radius: 4px;
+    outline: none;
+    color: #203238;
+    background: #fff;
+    font: inherit;
+}
+
+.workshop-modal textarea {
+    resize: vertical;
+}
+
+.workshop-modal button[type="submit"] {
+    margin-top: .5rem;
+    padding: .8rem 1rem;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: #276968;
+    cursor: pointer;
+    font-weight: 700;
+    transition: background .2s ease, transform .15s ease, box-shadow .15s ease;
+}
+
+.workshop-modal button[type="submit"]:hover {
+    background: #1b5252;
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px rgba(39, 105, 104, .18);
+}
+
+.workshop-modal input:focus,
+.workshop-modal textarea:focus,
+.workshop-modal select:focus {
+    border-color: #397b78;
+    box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
+}
+/* El número de memo se muestra completo, sin partirse en varias líneas. */
+.memo-cell {
+    white-space: nowrap;
+}
+
+/* Rango de fechas de los reportes (Taller y Tickets): Desde y Hasta en la misma fila. */
+.report-date-range {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: .75rem;
+}
+
+.report-date-range label {
+  display: block;
+}

@@ -1,0 +1,523 @@
+<!-- Control de permisos. Sistema aparte del inventario, organizado por departamento y área:
+  el jefe ve su área, el administrador de departamento su departamento, y el administrador
+  general y la consulta todo. La consulta solo ve y exporta. -->
+<main class="workshop-shell permisos-shell">
+  <app-header [moduleName]="moduleName"
+    (refresh)="refreshPanel()" (logout)="logout()" />
+  <div class="workshop-header panel-heading">
+    <p class="eyebrow">{{ departamentoTitulo.toUpperCase() || 'CONTROL DE PERMISOS' }}</p>
+    <h1>{{ titulo }}</h1>
+  </div>
+
+  @if (sesion) {
+  <nav class="permisos-tabs" aria-label="Secciones del control de permisos">
+    <button type="button" [class.active]="tab === 'panel'" (click)="selectTab('panel')">Permisos</button>
+    @if (!soloLectura) {
+    <button type="button" [class.active]="tab === 'personal'" (click)="selectTab('personal')">
+      {{ veVarias ? 'Personal' : 'Mi personal' }}
+    </button>
+    }
+    @if (administra) {
+    <button type="button" [class.active]="tab === 'areas'" (click)="selectTab('areas')">
+      {{ esAdmin ? 'Departamentos, áreas y jefes' : 'Áreas y jefes' }}
+    </button>
+    }
+  </nav>
+  }
+
+  @if (message) { <p class="feedback success" role="status">{{ message }}</p> }
+  @if (errorMessage && activeWindow === 'none') { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+  @for (aviso of avisosParametros; track aviso) {
+  <p class="feedback error" role="alert">
+    {{ aviso }} Mientras se corrige se muestra la jornada de 08:00 a 16:00 y no se pueden registrar permisos en ese departamento.
+  </p>
+  }
+
+  @if (sesion && !soloLectura && tab === 'personal') {
+  <app-permisos-personal [sesion]="sesion" [empleados]="empleados" (changed)="onPersonalChanged()" />
+  }
+
+  @if (sesion && administra && tab === 'areas') {
+  <app-permisos-areas [sesion]="sesion" [empleados]="empleados" (changed)="reloadSesion()" />
+  }
+
+  @if (sesion && tab === 'panel') {
+  @if (veVarias) {
+  <div class="area-filter-bar">
+    @if (veTodo && variosDepartamentos) {
+    <label class="inline-filter">
+      Departamento
+      <select nativeSelect [(ngModel)]="deptoFilter" (ngModelChange)="updateDepto()" name="deptoFilter">
+        <option [ngValue]="0">Todos los departamentos</option>
+        @for (departamento of sesion.Departamentos; track departamento.IdDepartamento) {
+        <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
+        }
+      </select>
+    </label>
+    }
+    <label class="inline-filter">
+      Área
+      <select nativeSelect [(ngModel)]="areaFilter" (ngModelChange)="updateFilter()" name="areaFilter">
+        <option [ngValue]="0">Todas las áreas</option>
+        @for (area of areasFiltro; track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
+      </select>
+    </label>
+    @if (soloLectura) { <span class="estado-badge finalizado">SOLO CONSULTA</span> }
+  </div>
+  }
+
+  <!-- Indicadores: permisos activos vigentes en cada período. -->
+  <section class="permisos-kpis" aria-label="Indicadores de permisos">
+    <article class="kpi-card kpi-primary">
+      <span class="kpi-label">Hoy</span>
+      <strong class="kpi-value">{{ permisosHoy.length }}</strong>
+      <span class="kpi-caption">empleados con permiso</span>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Esta semana</span>
+      <strong class="kpi-value">{{ permisosSemana }}</strong>
+      <span class="kpi-caption">permisos vigentes</span>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Este mes</span>
+      <strong class="kpi-value">{{ permisosMes }}</strong>
+      <span class="kpi-caption">permisos vigentes</span>
+    </article>
+    <article class="kpi-card">
+      <span class="kpi-label">Total</span>
+      <strong class="kpi-value">{{ totalActivos }}</strong>
+      <span class="kpi-caption">permisos activos desde el {{ formatDay(cargadoDesde) }}</span>
+    </article>
+  </section>
+
+  <!-- Quién está fuera hoy, con el alcance de su permiso. -->
+  <section class="permisos-hoy" aria-label="Empleados con permiso hoy">
+    <h2>Con permiso hoy</h2>
+    @if (permisosHoy.length === 0) {
+    <p class="hoy-empty">Nadie tiene permiso hoy.</p>
+    } @else {
+    <ul>
+      @for (permiso of permisosHoy; track permiso.IdPermiso) {
+      <li [class.finalizado]="estado(permiso) === 'FINALIZADO'">
+        <strong>{{ permiso.Empleado }}</strong>
+        <span class="tipo-badge" [class.hora]="permiso.Tipo === 'HORA'">{{ tipoLabel(permiso.Tipo) }}</span>
+        <span class="hoy-detalle">{{ hoyDetalle(permiso) }}</span>
+        @if (estado(permiso) === 'FINALIZADO') { <span class="estado-badge finalizado">FINALIZADO</span> }
+      </li>
+      }
+    </ul>
+    }
+  </section>
+
+  <!-- Registro de permisos. -->
+  <section class="workshop-section">
+    <div class="workshop-actions">
+      <div>
+        <p class="eyebrow">REGISTRO</p>
+        <h2>Permisos registrados</h2>
+      </div>
+      <div class="workshop-actions-group">
+        <button type="button" class="secondary" (click)="openReportWindow()" [disabled]="isExporting">Exportar reporte</button>
+        @if (!soloLectura) {
+        <button type="button" (click)="openNewWindow()" [disabled]="isSaving">Nuevo permiso</button>
+        }
+      </div>
+    </div>
+
+    <div class="permisos-filters">
+      <input type="search" class="permisos-search" [ngModel]="searchTerm" (ngModelChange)="updateSearch($event)"
+        name="permisoSearch" placeholder="Buscar por empleado, No. de pago o motivo" aria-label="Buscar permisos" />
+      <select nativeSelect [(ngModel)]="tipoFilter" (ngModelChange)="updateFilter()" name="tipoFilter" aria-label="Tipo de permiso">
+        <option value="">Todos los tipos</option>
+        @for (tipo of tipos; track tipo.value) { <option [value]="tipo.value">{{ tipo.label }}</option> }
+      </select>
+      <select nativeSelect [(ngModel)]="estadoFilter" (ngModelChange)="updateFilter()" name="estadoFilter" aria-label="Estado">
+        <option value="">Todos los estados</option>
+        @for (item of estados; track item.value) { <option [value]="item.value">{{ item.label }}</option> }
+      </select>
+      <label class="inline-filter">
+        Desde
+        <input type="date" class="permisos-date" [(ngModel)]="fechaDesde" (ngModelChange)="updateFilter()"
+          name="fechaDesde" [max]="fechaHasta" />
+      </label>
+      <label class="inline-filter">
+        Hasta
+        <input type="date" class="permisos-date" [(ngModel)]="fechaHasta" (ngModelChange)="updateFilter()"
+          name="fechaHasta" [min]="fechaDesde" />
+      </label>
+      @if (hayFiltroFechas) {
+      <button type="button" class="link-button" (click)="clearFechas()">Quitar fechas</button>
+      }
+      <app-table-page-size [(page)]="permisoPage" [(pageSize)]="permisoPageSize" />
+    </div>
+    <p class="field-hint">
+      Se muestran los permisos vigentes desde el {{ formatDay(cargadoDesde) }}. Para ver anteriores, elige una fecha
+      "Desde" anterior.
+    </p>
+
+    <div class="table-wrap">
+      <table class="permisos-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>TIPO</th>
+            <th>EMPLEADO</th>
+            @if (muestraDepartamento) { <th>DEPARTAMENTO</th> }
+            @if (veVarias) { <th>ÁREA</th> }
+            <th>MOTIVO</th>
+            <th>DESDE</th>
+            <th>HASTA</th>
+            <th>FECHA DE SOLICITUD</th>
+            <th>SALIDA</th>
+            <th>ENTRADA</th>
+            <th class="num">HORAS</th>
+            <th class="num">DÍAS HÁBILES</th>
+            <th>ESTADO</th>
+            <th>ACCIONES</th>
+          </tr>
+        </thead>
+        <tbody>
+          @if (isLoading && permisos.length === 0) {
+          <tr><td [attr.colspan]="columnas" class="empty">Cargando permisos...</td></tr>
+          } @else if (filteredPermisos.length === 0) {
+          <tr><td [attr.colspan]="columnas" class="empty">No hay permisos que coincidan.</td></tr>
+          } @else {
+          @for (permiso of filteredPermisos | page: permisoPage : permisoPageSize; track permiso.IdPermiso) {
+          <tr [class.permiso-anulado]="permiso.Estado === 'ANULADO'">
+            <td>{{ permiso.IdPermiso }}</td>
+            <td><span class="tipo-badge" [class.hora]="permiso.Tipo === 'HORA'">{{ tipoLabel(permiso.Tipo) }}</span></td>
+            <td>
+              <button type="button" class="empleado-link" (click)="openHistorial(permiso.IdEmpleado)"
+                title="Ver historial del empleado">{{ permiso.Empleado }}</button>
+              @if (permiso.NoPago) { <small class="no-pago">No. {{ permiso.NoPago }}</small> }
+            </td>
+            @if (muestraDepartamento) { <td>{{ permiso.NombreDepartamento ?? '-' }}</td> }
+            @if (veVarias) { <td>{{ permiso.NombreArea ?? 'Sin área' }}</td> }
+            <td class="motivo-cell">{{ permiso.Motivo }}</td>
+            <td>{{ formatDay(permiso.FechaInicio) }}</td>
+            <td>{{ formatDay(permiso.FechaFin) }}</td>
+            <td>{{ formatDay(permiso.FechaSolicitud) }}</td>
+            <td>{{ display(permiso.HoraSalida) }}</td>
+            <td>{{ display(permiso.HoraEntrada) }}</td>
+            <td class="num">{{ formatMinutes(permiso.Minutos) }}</td>
+            <td class="num">{{ permiso.Tipo === 'DIA' ? permiso.DiasHabiles : '-' }}</td>
+            <td>
+              <span class="estado-badge" [class.anulado]="estado(permiso) === 'ANULADO'"
+                [class.finalizado]="estado(permiso) === 'FINALIZADO'">{{ estado(permiso) }}</span>
+            </td>
+            <td class="row-actions">
+              @if (permiso.Estado === 'ACTIVO') {
+              @if (puedeModificar(permiso)) {
+              <button type="button" class="secondary" (click)="openEditWindow(permiso)">Editar</button>
+              }
+              <button type="button" class="secondary" (click)="imprimir(permiso)">Constancia</button>
+              @if (puedeModificar(permiso)) {
+              <button type="button" class="danger" (click)="openAnularWindow(permiso)">Anular</button>
+              } @else if (!soloLectura) {
+              <span class="closed" [title]="'Lo modifica quien administra ' + (permiso.NombreArea ? 'el área ' + permiso.NombreArea : 'ese permiso')">
+                {{ permiso.NombreArea ? 'Área ' + permiso.NombreArea : 'Otra área' }}
+              </span>
+              }
+              } @else {
+              <span class="closed">Anulado</span>
+              }
+            </td>
+          </tr>
+          }
+          }
+        </tbody>
+      </table>
+    </div>
+    <app-table-paginator [total]="filteredPermisos.length" [(page)]="permisoPage" [pageSize]="permisoPageSize"
+      label="Paginación de permisos" />
+  </section>
+  }
+
+  <!-- Nuevo permiso o edición: el tipo decide los datos. Por día: rango de fechas (solo días
+       hábiles). Por hora: una fecha con salida y entrada dentro de la jornada. -->
+  @if (activeWindow === 'permiso') {
+  <div class="modal-backdrop" role="presentation">
+    <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="permiso-title"
+      (click)="$event.stopPropagation()">
+      <div class="modal-heading">
+        <div>
+          <p class="eyebrow">{{ editingId === null ? 'NUEVO PERMISO' : 'EDITAR PERMISO #' + editingId }}</p>
+          <h2 id="permiso-title">{{ editingId === null ? 'Registrar permiso' : 'Editar permiso' }}</h2>
+          <p class="modal-subtitle">
+            @if (formTipo === 'DIA') {
+            No cuentan los fines de semana.
+            } @else {
+            Jornada laboral: {{ jornadaForm.HoraInicioJornada }} a {{ jornadaForm.HoraFinJornada }}.
+            }
+          </p>
+        </div>
+        <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
+      </div>
+      <form (ngSubmit)="savePermiso()">
+        @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+
+        <span class="form-label" id="permiso-tipo-label">Tipo de permiso</span>
+        <div class="tipo-selector" role="radiogroup" aria-labelledby="permiso-tipo-label">
+          @for (tipo of tipos; track tipo.value) {
+          <button type="button" role="radio" [attr.aria-checked]="formTipo === tipo.value"
+            [class.selected]="formTipo === tipo.value" (click)="changeTipo(tipo.value)">{{ tipo.label }}</button>
+          }
+        </div>
+
+        <label for="permiso-empleado">Empleado</label>
+        <select id="permiso-empleado" [(ngModel)]="comunForm.IdEmpleado" name="permisoEmpleado" required>
+          <option [ngValue]="0">Selecciona el empleado</option>
+          @for (empleado of empleadosForm; track empleado.IdEmpleado) {
+          <option [ngValue]="empleado.IdEmpleado">{{ empleadoLabel(empleado) }}</option>
+          }
+        </select>
+        @if (empleadosForm.length === 0) {
+        <p class="field-hint">No hay empleados asignados al área. Agrégalos en la sección de personal.</p>
+        }
+        @if (consumoForm; as consumo) {
+        <div class="consumo-box" aria-live="polite">
+          <span><strong>Este mes:</strong> {{ consumoTexto(consumo.Mes) }}</span>
+          <span><strong>Este año:</strong> {{ consumoTexto(consumo.Anio) }}
+            @if (consumo.Anio.TotalDias > 0) { · {{ formatNumber(consumo.Anio.TotalDias) }} días en total }</span>
+          @if (editingId !== null) { <small>Sin contar este permiso.</small> }
+        </div>
+        }
+
+        <label for="permiso-motivo">Motivo del permiso</label>
+        <textarea id="permiso-motivo" appMayusculas [(ngModel)]="comunForm.Motivo" name="permisoMotivo" rows="3" maxlength="1000"
+          placeholder="Describe el motivo" required></textarea>
+
+        @if (formTipo === 'DIA') {
+        <div class="form-pair">
+          <div>
+            <label for="dia-inicio">Desde</label>
+            <input id="dia-inicio" type="date" [(ngModel)]="diaForm.FechaInicio" (ngModelChange)="syncFechaFin()"
+              name="diaInicio" required />
+          </div>
+          <div>
+            <label for="dia-fin">Hasta</label>
+            <input id="dia-fin" type="date" [(ngModel)]="diaForm.FechaFin" [min]="diaForm.FechaInicio"
+              name="diaFin" required />
+          </div>
+        </div>
+        @if (diaForm.FechaInicio && diaForm.FechaFin) {
+        <p class="form-preview">
+          @if (diaPreview > 0) {
+          <strong>{{ diaPreview }} {{ diaPreview === 1 ? 'día hábil' : 'días hábiles' }}</strong>.
+          } @else {
+          El rango no tiene días hábiles.
+          }
+        </p>
+        }
+
+        <label for="dia-solicitud">Fecha de solicitud</label>
+        <input id="dia-solicitud" type="date" [(ngModel)]="diaForm.FechaSolicitud" [max]="hoy" name="diaSolicitud" required />
+        } @else {
+        <label for="hora-fecha">Fecha del permiso</label>
+        <input id="hora-fecha" type="date" [(ngModel)]="horaForm.Fecha" name="horaFecha" required />
+
+        <div class="form-pair">
+          <div>
+            <label for="hora-salida">Hora de salida</label>
+            <input id="hora-salida" type="time" [(ngModel)]="horaForm.HoraSalida" name="horaSalida"
+              [min]="jornadaForm.HoraInicioJornada" [max]="jornadaForm.HoraFinJornada" required />
+          </div>
+          <div>
+            <label for="hora-entrada">Hora de entrada</label>
+            <input id="hora-entrada" type="time" [(ngModel)]="horaForm.HoraEntrada" name="horaEntrada"
+              [min]="horaForm.HoraSalida || jornadaForm.HoraInicioJornada" [max]="jornadaForm.HoraFinJornada" required />
+          </div>
+        </div>
+        @if (horaPreview > 0) {
+        <p class="form-preview">Duración: <strong>{{ formatMinutes(horaPreview) }}</strong></p>
+        }
+        }
+
+        <button type="submit" [disabled]="isSaving">
+          {{ isSaving ? 'Guardando...' : (editingId === null ? 'Registrar permiso' : 'Guardar cambios') }}
+        </button>
+      </form>
+    </section>
+  </div>
+  }
+
+  <!-- Historial de un empleado: totales sin anulados y todos sus permisos. -->
+  @if (activeWindow === 'historial') {
+  <div class="modal-backdrop" role="presentation">
+    <section class="workshop-modal historial-modal" role="dialog" aria-modal="true" aria-labelledby="historial-title"
+      (click)="$event.stopPropagation()">
+      <div class="modal-heading">
+        <div>
+          <p class="eyebrow">HISTORIAL DEL EMPLEADO</p>
+          <h2 id="historial-title">{{ historialEmpleado.Nombre }}</h2>
+          <p class="modal-subtitle">
+            @if (historialEmpleado.NoPago) { No. de pago {{ historialEmpleado.NoPago }} · }
+            {{ historialEmpleado.Area ?? 'Sin área' }}
+            @if (veTodo && variosDepartamentos && historialEmpleado.Departamento) { · {{ historialEmpleado.Departamento }} }
+          </p>
+        </div>
+        <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
+      </div>
+      @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+
+      <div class="historial-totales">
+        @for (item of historialPeriodos; track item.label) {
+        <article class="kpi-card">
+          <span class="kpi-label">{{ item.label }}</span>
+          <strong class="historial-valor">{{ consumoTexto(item.valor) }}</strong>
+          <span class="kpi-caption">
+            {{ item.valor.PermisosDia + item.valor.PermisosHora }} permisos · {{ formatNumber(item.valor.TotalDias) }} días en total
+          </span>
+        </article>
+        }
+      </div>
+      @if (historialCargando) {
+      <p class="field-hint" aria-live="polite">Cargando el historial completo...</p>
+      }
+      <p class="field-hint">
+        Los totales no incluyen los anulados. Las horas se convierten a días con la jornada de
+        {{ historialJornada.HoraInicioJornada }} a {{ historialJornada.HoraFinJornada }}.
+      </p>
+
+      <div class="table-wrap">
+        <table class="resumen-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>TIPO</th>
+              <th>FECHA</th>
+              <th class="num">DURACIÓN</th>
+              <th>MOTIVO</th>
+              <th>ESTADO</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (permiso of historialPermisos; track permiso.IdPermiso) {
+            <tr [class.permiso-anulado]="permiso.Estado === 'ANULADO'">
+              <td>{{ permiso.IdPermiso }}</td>
+              <td><span class="tipo-badge" [class.hora]="permiso.Tipo === 'HORA'">{{ tipoLabel(permiso.Tipo) }}</span></td>
+              <td>
+                @if (permiso.Tipo === 'DIA') {
+                {{ formatDay(permiso.FechaInicio) }} al {{ formatDay(permiso.FechaFin) }}
+                } @else {
+                {{ formatDay(permiso.FechaInicio) }} · {{ permiso.HoraSalida }} a {{ permiso.HoraEntrada }}
+                }
+              </td>
+              <td class="num">
+                {{ permiso.Tipo === 'DIA'
+                  ? permiso.DiasHabiles + (permiso.DiasHabiles === 1 ? ' día' : ' días')
+                  : formatMinutes(permiso.Minutos) }}
+              </td>
+              <td class="motivo-cell">{{ permiso.Motivo }}</td>
+              <td>
+                <span class="estado-badge" [class.anulado]="estado(permiso) === 'ANULADO'"
+                  [class.finalizado]="estado(permiso) === 'FINALIZADO'">{{ estado(permiso) }}</span>
+              </td>
+              <td>
+                @if (permiso.Estado === 'ACTIVO') {
+                <button type="button" class="secondary" (click)="imprimir(permiso)">Constancia</button>
+                }
+              </td>
+            </tr>
+            } @empty {
+            <tr><td colspan="7" class="empty">El empleado no tiene permisos registrados.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+  }
+
+  <!-- Anular: el permiso se conserva, pero deja de contar en los totales y los límites. -->
+  @if (activeWindow === 'anular' && selectedPermiso) {
+  <div class="modal-backdrop" role="presentation">
+    <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="permiso-anular-title"
+      (click)="$event.stopPropagation()">
+      <div class="modal-heading">
+        <div>
+          <p class="eyebrow">ANULAR</p>
+          <h2 id="permiso-anular-title">Anular permiso #{{ selectedPermiso.IdPermiso }}</h2>
+          <p class="modal-subtitle">
+            {{ selectedPermiso.Empleado }} · {{ tipoLabel(selectedPermiso.Tipo) }} ·
+            @if (selectedPermiso.Tipo === 'DIA') {
+            {{ formatDay(selectedPermiso.FechaInicio) }} al {{ formatDay(selectedPermiso.FechaFin) }}
+            } @else {
+            {{ formatDay(selectedPermiso.FechaInicio) }}, {{ selectedPermiso.HoraSalida }} a {{ selectedPermiso.HoraEntrada }}
+            }
+          </p>
+        </div>
+        <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
+      </div>
+      <form (ngSubmit)="confirmAnular()">
+        @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+        <p class="anular-text">
+          El permiso queda en el historial como anulado y deja de contar en los totales. Esta acción no se puede deshacer.
+        </p>
+        <div class="anular-actions">
+          <button type="button" class="secondary" (click)="closeWindow()">Cancelar</button>
+          <button type="submit" class="danger-solid" [disabled]="isSaving">{{ isSaving ? 'Anulando...' : 'Anular permiso' }}</button>
+        </div>
+      </form>
+    </section>
+  </div>
+  }
+
+  <!-- Exportación a Excel: detalle de permisos y totales por empleado. -->
+  @if (activeWindow === 'report') {
+  <div class="modal-backdrop" role="presentation">
+    <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="permiso-report-title"
+      (click)="$event.stopPropagation()">
+      <div class="modal-heading">
+        <div>
+          <p class="eyebrow">REPORTE</p>
+          <h2 id="permiso-report-title">Exportar reporte de permisos</h2>
+          <p class="modal-subtitle">Excel con el detalle de los permisos y una hoja de totales por empleado.</p>
+        </div>
+        <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
+      </div>
+      <form (ngSubmit)="exportReport()">
+        @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+        <div class="form-pair">
+          <div>
+            <label for="report-from">Desde</label>
+            <input id="report-from" type="date" [(ngModel)]="reportFilters.desde" name="reportFrom" />
+          </div>
+          <div>
+            <label for="report-to">Hasta</label>
+            <input id="report-to" type="date" [(ngModel)]="reportFilters.hasta" name="reportTo" />
+          </div>
+        </div>
+
+        <label for="report-type">Tipo</label>
+        <select nativeSelect id="report-type" [(ngModel)]="reportFilters.tipo" name="reportType">
+          <option value="">Todos</option>
+          @for (tipo of tipos; track tipo.value) { <option [value]="tipo.value">{{ tipo.label }}</option> }
+        </select>
+
+        <label for="report-state">Estado</label>
+        <select nativeSelect id="report-state" [(ngModel)]="reportFilters.estado" name="reportState">
+          <option value="">Todos</option>
+          @for (item of estados; track item.value) { <option [value]="item.value">{{ item.label }}</option> }
+        </select>
+
+        <label for="report-employee">Empleado</label>
+        <select id="report-employee" [(ngModel)]="reportFilters.idEmpleado" name="reportEmployee">
+          <option [ngValue]="0">Todos</option>
+          @for (empleado of empleadosForm; track empleado.IdEmpleado) {
+          <option [ngValue]="empleado.IdEmpleado">{{ empleadoLabel(empleado) }}</option>
+          }
+        </select>
+
+        @if (reportCountExacto) {
+        <p class="field-hint">{{ reportCount }} permiso(s) cumplen los filtros.</p>
+        } @else {
+        <p class="field-hint">Incluye permisos anteriores al {{ formatDay(cargadoDesde) }}: el total se calcula al exportar.</p>
+        }
+        <button type="submit" [disabled]="isExporting">{{ isExporting ? 'Generando...' : 'Exportar a Excel' }}</button>
+      </form>
+    </section>
+  </div>
+  }
+</main>

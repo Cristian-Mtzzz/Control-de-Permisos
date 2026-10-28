@@ -1,0 +1,540 @@
+/* Solo lo propio del Control de permisos: el resto del aspecto (shell, tabla, modales y
+   botones) viene de taller.component.css y de las reglas globales de styles.css. */
+
+/* ---- Pestañas y filtro de área ----------------------------------------------------- */
+.permisos-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-top: 1.5rem;
+    border-bottom: 1px solid #d8e4e0;
+}
+
+.permisos-tabs button {
+    margin-bottom: -1px;
+    padding: .7rem 1.1rem;
+    border: 0;
+    border-bottom: 3px solid transparent;
+    color: #617573;
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.permisos-tabs button:hover {
+    color: #18383b;
+}
+
+.permisos-tabs button.active {
+    border-bottom-color: #276968;
+    color: #276968;
+}
+
+.area-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: .75rem 1.5rem;
+    margin-top: 1.25rem;
+}
+
+/* ---- Indicadores ------------------------------------------------------------------- */
+.permisos-kpis {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 1.75rem;
+}
+
+.kpi-card {
+    display: grid;
+    gap: .2rem;
+    padding: 1.1rem 1.25rem;
+    border: 1px solid #d8e4e0;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.kpi-label {
+    color: #397b78;
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+}
+
+.kpi-value {
+    color: #18383b;
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 2.1rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.1;
+}
+
+.kpi-caption {
+    color: #718080;
+    font-size: .78rem;
+}
+
+/* "Hoy" es el dato del día: se destaca con el color principal. */
+.kpi-primary {
+    border-color: #276968;
+    background: #276968;
+}
+
+.kpi-primary .kpi-label,
+.kpi-primary .kpi-caption {
+    color: #d5ebe4;
+}
+
+.kpi-primary .kpi-value {
+    color: #fff;
+}
+
+/* ---- Con permiso hoy --------------------------------------------------------------- */
+.permisos-hoy {
+    margin-top: 1rem;
+    padding: 1rem 1.25rem;
+    border: 1px solid #d8e4e0;
+    border-radius: 10px;
+    background: #fff;
+}
+
+.permisos-hoy h2 {
+    margin-bottom: .6rem;
+    color: #18383b;
+    font-size: .95rem;
+}
+
+.permisos-hoy ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.permisos-hoy li {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .4rem .7rem;
+    border: 1px solid #e1ebe8;
+    border-radius: 999px;
+    background: #f8fbfa;
+    font-size: .8rem;
+}
+
+.hoy-detalle,
+.hoy-empty {
+    color: #718080;
+}
+
+.hoy-empty {
+    margin: 0;
+    font-size: .82rem;
+}
+
+/* ---- Tablas ------------------------------------------------------------------------ */
+/* taller.component.css fija un ancho mínimo muy grande; estas tablas tienen menos columnas. */
+.resumen-table {
+    min-width: 720px;
+}
+
+.permisos-table {
+    min-width: 1300px;
+}
+
+th.num,
+td.num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.motivo-cell {
+    max-width: 18rem;
+    white-space: pre-wrap;
+}
+
+.no-pago {
+    display: block;
+    color: #718080;
+    font-size: .7rem;
+}
+
+.permiso-anulado td {
+    color: #8a9896;
+}
+
+.tipo-badge,
+.estado-badge {
+    display: inline-block;
+    padding: .2rem .55rem;
+    border-radius: 999px;
+    color: #1f6b43;
+    background: #dcecd8;
+    font-size: .7rem;
+    font-weight: 700;
+    white-space: nowrap;
+}
+
+.tipo-badge.hora {
+    color: #28658a;
+    background: #dceefa;
+}
+
+.estado-badge.anulado {
+    color: #8c2f39;
+    background: #f7dfe1;
+}
+
+/* Activo en la base, pero su hora o su último día ya pasó. */
+.estado-badge.finalizado {
+    color: #55626a;
+    background: #e6eaec;
+}
+
+.permisos-hoy li.finalizado {
+    opacity: .7;
+}
+
+.row-actions {
+    display: flex;
+    flex-direction: column;
+    gap: .35rem;
+    min-width: 6.5rem;
+}
+
+/* ---- Filtros ----------------------------------------------------------------------- */
+.permisos-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+}
+
+.permisos-filters app-table-page-size {
+    margin-bottom: 0;
+    margin-left: auto;
+}
+
+/* Desde qué fecha están cargados los permisos de la tabla. */
+.permisos-filters + .field-hint {
+    margin: .45rem 0 .2rem;
+}
+
+.permisos-search,
+.permisos-filters select,
+.inline-filter select {
+    min-height: 2.4rem;
+    padding: .45rem .75rem;
+    border: 1px solid #d3dfdb;
+    border-radius: 8px;
+    color: #203238;
+    background: #fff;
+    font: inherit;
+}
+
+.permisos-search {
+    flex: 0 1 22rem;
+}
+
+.permisos-date {
+    min-height: 2.4rem;
+    padding: .35rem .6rem;
+    border: 1px solid #d3dfdb;
+    border-radius: 8px;
+    color: #203238;
+    background: #fff;
+    font: inherit;
+    font-size: .85rem;
+}
+
+.permisos-date:focus {
+    border-color: #276968;
+    outline: none;
+}
+
+.link-button {
+    padding: .3rem .4rem;
+    border: 0;
+    color: #276968;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    font: inherit;
+    font-size: .8rem;
+    font-weight: 700;
+    text-decoration: underline;
+}
+
+/* Nombre del empleado en la tabla: abre su historial. */
+.empleado-link {
+    padding: 0;
+    border: 0;
+    color: #18383b;
+    background: transparent;
+    box-shadow: none;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.empleado-link:hover,
+.empleado-link:focus-visible {
+    color: #276968;
+    text-decoration: underline;
+}
+
+/* Lo que ya lleva el empleado elegido en el formulario. */
+.consumo-box {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem 1rem;
+    padding: .6rem .8rem;
+    border-left: 3px solid #276968;
+    border-radius: 4px;
+    color: #294649;
+    background: #f4f8f7;
+    font-size: .8rem;
+}
+
+.consumo-box small {
+    flex-basis: 100%;
+    color: #718080;
+}
+
+/* ---- Historial por empleado -------------------------------------------------------- */
+.workshop-modal.historial-modal {
+    width: min(900px, 100%);
+}
+
+.historial-totales {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .75rem;
+    margin-bottom: .5rem;
+}
+
+.historial-valor {
+    color: #18383b;
+    font-size: 1.05rem;
+}
+
+@media (max-width: 640px) {
+    .historial-totales {
+        grid-template-columns: 1fr;
+    }
+}
+
+.permisos-filters select,
+.inline-filter select {
+    width: auto;
+}
+
+.permisos-search:focus,
+.permisos-filters select:focus,
+.inline-filter select:focus {
+    border-color: #276968;
+    outline: none;
+}
+
+.inline-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: #617573;
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.field-hint {
+    margin: 0;
+    color: #718080;
+    font-size: .76rem;
+}
+
+/* ---- Formularios ------------------------------------------------------------------- */
+.form-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+}
+
+.form-pair label {
+    display: block;
+    margin-bottom: .35rem;
+}
+
+/* Tipo de permiso del formulario: dos opciones que se ven como botones de un mismo grupo. */
+.form-label {
+    color: #294649;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.tipo-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    border: 1px solid #d7e2df;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.workshop-modal .tipo-selector button {
+    padding: .7rem .8rem;
+    border: 0;
+    border-radius: 0;
+    color: #405457;
+    background: #ffffff;
+    box-shadow: none;
+    cursor: pointer;
+    font: inherit;
+    font-size: .88rem;
+    font-weight: 700;
+}
+
+.workshop-modal .tipo-selector button + button {
+    border-left: 1px solid #d7e2df;
+}
+
+.workshop-modal .tipo-selector button.selected {
+    color: #ffffff;
+    background: #276968;
+}
+
+.form-preview {
+    margin: 0;
+    padding: .6rem .8rem;
+    border-radius: 4px;
+    color: #276968;
+    background: #eef5f2;
+    font-size: .8rem;
+}
+
+.anular-text {
+    margin: 0;
+    color: #405457;
+    font-size: .85rem;
+}
+
+.anular-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .6rem;
+    margin-top: .5rem;
+}
+
+.workshop-modal .anular-actions button {
+    margin-top: 0;
+    padding: .75rem 1rem;
+}
+
+.workshop-modal button.danger-solid {
+    background: #9b3f38;
+}
+
+.workshop-modal button.danger-solid:hover {
+    background: #7f322c;
+    box-shadow: none;
+}
+
+/* ---- Personal y áreas -------------------------------------------------------------- */
+.personal-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: .75rem;
+}
+
+.personal-add-field {
+    display: grid;
+    flex: 0 1 28rem;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.personal-add-field label {
+    color: #294649;
+    font-size: .78rem;
+    font-weight: 700;
+}
+
+.personal-add button {
+    padding: .75rem 1.2rem;
+    border: 0;
+    border-radius: 5px;
+    color: #fff;
+    background: #276968;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.personal-add button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+.row-select {
+    width: auto;
+    min-width: 11rem;
+    padding: .4rem .6rem;
+    border: 1px solid #d3dfdb;
+    border-radius: 6px;
+    background: #fff;
+    font: inherit;
+}
+
+.row-actions-inline {
+    flex-direction: row;
+    flex-wrap: wrap;
+}
+
+.jefes-table {
+    min-width: 900px;
+}
+
+.check-option {
+    display: flex;
+    align-items: flex-start;
+    gap: .55rem;
+    margin-top: .4rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.workshop-modal .check-option input {
+    width: auto;
+    margin: .15rem 0 0;
+}
+
+@media (max-width: 900px) {
+    .permisos-kpis {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .permisos-kpis,
+    .form-pair {
+        grid-template-columns: 1fr;
+    }
+
+    .permisos-filters app-table-page-size {
+        margin-left: 0;
+    }
+}
+
+/* Búsqueda de la cuenta de inventario por usuario exacto (administrador de departamento). */
+.acceso-busqueda {
+  display: flex;
+  gap: 8px;
+}
+
+.acceso-busqueda input {
+  flex: 1;
+  min-width: 0;
+}

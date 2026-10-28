@@ -1,0 +1,52 @@
+# .NET build output and local tooling
+**/bin/
+**/obj/
+*.user
+*.suo
+
+
+# Angular and Node dependencies/build output
+**/node_modules/
+**/.angular/
+**/dist/
+**/.cache/
+npm-debug.log*
+
+# IDE and OS files
+.vs/
+.vscode/*.log
+.DS_Store
+Thumbs.db
+
+# Angular and frontend tooling output
+
+/tmp
+/out-tsc
+/bazel-out
+yarn-error.log
+/coverage
+/libpeerconnection.log
+/typings
+**/__screenshots__/
+
+# IDE and editor metadata
+.idea/
+*.launch
+*.sublime-workspace
+.history/
+**/.sass-cache/
+**/connect.lock
+**/testem.log
+.project
+.classpath
+.c9/
+.settings/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+!.vscode/mcp.json
+
+# Documentación interna (instrucciones de despliegue y datos del entorno): solo local, no se sube.
+docs/interno/
