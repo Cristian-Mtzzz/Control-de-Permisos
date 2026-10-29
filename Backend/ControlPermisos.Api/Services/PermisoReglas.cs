@@ -158,6 +158,14 @@ internal static class PermisoReglas
     public static bool EsDiaHabil(DateTime dia, IReadOnlySet<DateTime> feriados) =>
         dia.DayOfWeek is not (DayOfWeek.Saturday or DayOfWeek.Sunday) && !feriados.Contains(dia.Date);
 
+    // Igual que el estado de la pantalla: el permiso por hora finaliza en su hora de entrada; el
+    // de día, al cierre de la jornada de su último día. Finalizado ya no se edita ni se anula.
+    public static bool Finalizado(string tipo, DateTime fechaFin, TimeOnly? horaEntrada, TimeOnly finJornada, DateTime ahora)
+    {
+        var horaFin = tipo == PermisoValores.TipoHora && horaEntrada is { } entrada ? entrada : finJornada;
+        return ahora >= fechaFin.Date.Add(horaFin.ToTimeSpan());
+    }
+
     private static string Describir(Existente permiso) => permiso.Tipo == PermisoValores.TipoHora
         ? $"un permiso por hora el {permiso.FechaInicio:dd/MM/yyyy} de {permiso.HoraSalida:HH:mm} a {permiso.HoraEntrada:HH:mm}"
         : permiso.FechaInicio == permiso.FechaFin

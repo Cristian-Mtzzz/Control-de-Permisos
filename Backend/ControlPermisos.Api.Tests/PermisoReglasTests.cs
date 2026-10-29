@@ -186,4 +186,23 @@ public sealed class PermisoReglasTests
         Assert.Contains("en 2027", Falla(() => ValidarLimites(nueva, 10, 0, [], Parametros(maxDiasPorAnio: 5), SinFeriados)));
         ValidarLimites(nueva, 10, 0, [], Parametros(maxDiasPorAnio: 6), SinFeriados);
     }
+
+    // ---- Finalizado ----------------------------------------------------------------------
+
+    [Fact]
+    public void PermisoPorHoraFinalizaEnSuHoraDeEntrada()
+    {
+        var entrada = new TimeOnly(13, 0);
+        Assert.False(Finalizado("HORA", Lunes, entrada, new TimeOnly(16, 0), Lunes.AddHours(12).AddMinutes(59)));
+        Assert.True(Finalizado("HORA", Lunes, entrada, new TimeOnly(16, 0), Lunes.AddHours(13)));
+    }
+
+    [Fact]
+    public void PermisoPorDiaFinalizaAlCierreDeLaJornadaDeSuUltimoDia()
+    {
+        var fin = Lunes.AddDays(2);
+        Assert.False(Finalizado("DIA", fin, null, new TimeOnly(16, 0), fin.AddHours(15).AddMinutes(59)));
+        Assert.True(Finalizado("DIA", fin, null, new TimeOnly(16, 0), fin.AddHours(16)));
+        Assert.True(Finalizado("DIA", fin, null, new TimeOnly(16, 0), fin.AddDays(1)));
+    }
 }

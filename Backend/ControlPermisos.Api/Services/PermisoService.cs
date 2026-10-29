@@ -142,15 +142,16 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
         Guardar(alcance, idPermiso, SolicitudHora(permiso), cancellationToken);
 
     // Anular conserva el registro, pero deja de contar en los totales, los choques y los límites.
-    // Cada usuario solo anula permisos de su alcance.
-    public async Task<bool> AnularPermiso(PermisoAlcance alcance, int idPermiso, CancellationToken cancellationToken) =>
-        await Execute($"""
-            UPDATE PERMISO_SOLICITUD p
-            SET p.ESTADO = 'ANULADO'
-            WHERE p.ID_PERMISO = :idPermiso
-              AND p.ESTADO = 'ACTIVO'
-              {DentroDelAlcance(alcance, "p.ID_AREA")}
-            """, cancellationToken, [("idPermiso", idPermiso), .. alcance.ParametrosArea()]) > 0;
+    // Cada usuario solo anula permisos de su alcance, y solo mientras no hayan finalizado.
+    public Task<bool> AnularPermiso(PermisoAlcance alcance, int idPermiso, CancellationToken cancellationToken) =>
+        InTransaction(async (connection, transaction) =>
+        {
+            if (await LeerModificable(connection, transaction, alcance, idPermiso, "anular", cancellationToken) is null) return false;
+            await Execute(connection, transaction,
+                "UPDATE PERMISO_SOLICITUD SET ESTADO = 'ANULADO' WHERE ID_PERMISO = :idPermiso", cancellationToken,
+                ("idPermiso", idPermiso));
+            return true;
+        }, cancellationToken);
 
     // Agrega al empleado a un área de su mismo departamento. El jefe solo toma empleados sin
     // área y los lleva a la suya; los administradores mueven a cualquiera dentro de su alcance.
@@ -237,28 +238,8 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             int? idArea = null;
             if (idPermiso is { } id)
             {
-                var actual = await ReadRows(connection, transaction, """
-                    SELECT p.ESTADO, p.ID_EMPLEADO, p.ID_AREA, a.DEPARTAMENTO_IHSS_ID
-                    FROM PERMISO_SOLICITUD p
-                    LEFT JOIN PERMISO_AREA a ON a.ID_AREA = p.ID_AREA
-                    WHERE p.ID_PERMISO = :idPermiso
-                    """, reader => (
-                        Estado: ReadString(reader, "ESTADO").Trim(),
-                        IdEmpleado: ReadInt(reader, "ID_EMPLEADO"),
-                        IdArea: ReadNullableInt(reader, "ID_AREA"),
-                        IdDepartamento: ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID")),
-                    cancellationToken, ("idPermiso", id));
-                if (actual.Count == 0) return false;
-                // Los permisos sin área (anteriores a las áreas) solo los ve quien ve todo.
-                var dentro = actual[0] is { IdArea: { } areaActual, IdDepartamento: { } deptoActual }
-                    ? alcance.IncluyeArea(areaActual, deptoActual)
-                    : alcance.VeTodo;
-                if (!dentro) return false;
-                if (!actual[0].Estado.Equals(PermisoValores.Activo, StringComparison.OrdinalIgnoreCase))
-                {
-                    throw new ArgumentException("El permiso está anulado y ya no se puede editar.");
-                }
-                if (actual[0].IdEmpleado == nueva.IdEmpleado && actual[0].IdArea is not null) idArea = actual[0].IdArea;
+                if (await LeerModificable(connection, transaction, alcance, id, "editar", cancellationToken) is not { } actual) return false;
+                if (actual.IdEmpleado == nueva.IdEmpleado && actual.IdArea is not null) idArea = actual.IdArea;
             }
 
             var conservaArea = idArea is not null;
@@ -343,6 +324,60 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                 """, cancellationToken, [.. valores, ("idPermiso", nuevoId), ("tipo", nueva.Tipo)]);
             return true;
         }, cancellationToken);
+
+    // Permiso que se va a editar o anular (accion), bloqueado hasta el fin de la transacción.
+    // Devuelve null si no existe o está fuera del alcance del usuario; si está anulado o ya
+    // finalizó, no se puede modificar.
+    private static async Task<PermisoActual?> LeerModificable(
+        DbConnection connection,
+        DbTransaction transaction,
+        PermisoAlcance alcance,
+        int idPermiso,
+        string accion,
+        CancellationToken cancellationToken)
+    {
+        // La jornada que marca el fin es la del departamento del área del permiso; los permisos sin
+        // área usan la del departamento del empleado.
+        var filas = await ReadRows(connection, transaction, """
+            SELECT p.ESTADO, p.TIPO, p.ID_EMPLEADO, p.ID_AREA, a.DEPARTAMENTO_IHSS_ID, p.FECHA_FIN, p.HORA_ENTRADA,
+                   COALESCE(a.DEPARTAMENTO_IHSS_ID, e.DEPARTAMENTO_IHSS_ID) AS DEPTO_JORNADA
+            FROM PERMISO_SOLICITUD p
+            LEFT JOIN PERMISO_AREA a ON a.ID_AREA = p.ID_AREA
+            LEFT JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = p.ID_EMPLEADO
+            WHERE p.ID_PERMISO = :idPermiso
+            FOR UPDATE OF p.ESTADO
+            """, reader => new PermisoActual(
+                ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
+                ReadString(reader, "TIPO").Trim().ToUpperInvariant(),
+                ReadInt(reader, "ID_EMPLEADO"),
+                ReadNullableInt(reader, "ID_AREA"),
+                ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
+                ReadDate(reader, "FECHA_FIN"),
+                PermisoParametros.TryParseHora(ReadNullableString(reader, "HORA_ENTRADA")),
+                ReadNullableInt(reader, "DEPTO_JORNADA")),
+            cancellationToken, ("idPermiso", idPermiso));
+        if (filas.Count == 0) return null;
+        var actual = filas[0];
+        // Los permisos sin área (anteriores a las áreas) solo los ve quien ve todo.
+        var dentro = actual is { IdArea: { } area, IdDepartamento: { } departamento }
+            ? alcance.IncluyeArea(area, departamento)
+            : alcance.VeTodo;
+        if (!dentro) return null;
+        if (actual.Estado != PermisoValores.Activo)
+        {
+            throw new ArgumentException($"El permiso está anulado y ya no se puede {accion}.");
+        }
+
+        var parametros = actual.IdDepartamentoJornada is { } deptoJornada
+            ? PermisoParametros.Para(deptoJornada,
+                await ReadRows(connection, transaction, PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken))
+            : PermisoParametros.PorDefecto;
+        if (Finalizado(actual.Tipo, actual.FechaFin, actual.HoraEntrada, parametros.FinJornada, DateTime.Now))
+        {
+            throw new ArgumentException($"El permiso ya finalizó y no se puede {accion}.");
+        }
+        return actual;
+    }
 
     // El empleado debe estar activo y ser del departamento del área (quien llama ya revisó que el
     // área y su departamento estén activos).
@@ -440,4 +475,15 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
 
     // Departamento y estados de un área.
     private sealed record AreaDatos(int IdDepartamento, string Estado, string EstadoDepartamento);
+
+    // Permiso guardado que se va a editar o anular.
+    private sealed record PermisoActual(
+        string Estado,
+        string Tipo,
+        int IdEmpleado,
+        int? IdArea,
+        int? IdDepartamento,
+        DateTime FechaFin,
+        TimeOnly? HoraEntrada,
+        int? IdDepartamentoJornada);
 }

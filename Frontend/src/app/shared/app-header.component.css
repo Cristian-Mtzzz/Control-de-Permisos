@@ -24,12 +24,26 @@
     backdrop-filter: blur(6px);
 }
 
-/* Franja de acento superior. */
+/* Franja de acento superior: el mismo degradado en movimiento que la barra del login. */
+@keyframes headerGradientShift {
+
+    0%,
+    100% {
+        background-position: 0% 50%;
+    }
+
+    50% {
+        background-position: 100% 50%;
+    }
+}
+
 .app-header::before {
     position: absolute;
     inset: 0 0 auto;
     height: 3px;
-    background: linear-gradient(90deg, var(--header-accent), var(--header-accent-dark));
+    background: linear-gradient(120deg, #1f5857, #2f8683 55%, #276968);
+    background-size: 200% 200%;
+    animation: headerGradientShift 10s ease-in-out infinite;
     content: '';
 }
 
