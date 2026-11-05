@@ -16,6 +16,15 @@ describe('toPascalCase', () => {
     expect(toPascalCase(body)).toEqual(body);
   });
 
+  it('no copia la respuesta: devuelve el mismo objeto y los mismos arreglos', () => {
+    const items = [{ IdPermiso: 1 }, { idPermiso: 2 }];
+    const result = toPascalCase<{ IdPermiso: number }[]>(items);
+
+    expect(result).toBe(items);
+    expect(result[0]).toBe(items[0]);
+    expect(result).toEqual([{ IdPermiso: 1 }, { IdPermiso: 2 }]);
+  });
+
   it('respeta valores primitivos y null', () => {
     expect(toPascalCase(null)).toBeNull();
     expect(toPascalCase('texto')).toBe('texto');

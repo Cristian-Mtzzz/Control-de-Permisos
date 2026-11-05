@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Globalization;
+using Microsoft.EntityFrameworkCore;
 using ControlPermisos.Api.Data;
 using ControlPermisos.Api.Models;
 using static ControlPermisos.Api.Services.PermisoReglas;
@@ -16,8 +17,9 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
     // el de departamento reciben además todos los permisos de su personal actual aunque se hayan
     // registrado en otra área: son los mismos que se cuentan para choques y límites. Solo
     // modifican los registrados en su alcance. El filtro limita la lista para no enviar siempre
-    // todo el historial: Desde deja los que terminan ese día o después, IdEmpleado los de uno.
-    public Task<IReadOnlyList<PermisoDto>> GetPermisos(
+    // todo el historial: Desde deja los que terminan ese día o después, Hasta los que empiezan
+    // ese día o antes, IdEmpleado los de uno.
+    public async Task<IReadOnlyList<PermisoDto>> GetPermisos(
         PermisoAlcance alcance,
         PermisoFiltro filtro,
         CancellationToken cancellationToken)
@@ -45,6 +47,12 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             condiciones.Add("p.FECHA_FIN >= :desde");
             valores.Add(("desde", desde.Date));
         }
+        if (filtro.Hasta is { } hasta)
+        {
+            // Semiabierto: FECHA_INICIO puede traer hora.
+            condiciones.Add("p.FECHA_INICIO < :hastaExclusivo");
+            valores.Add(("hastaExclusivo", hasta.Date.AddDays(1)));
+        }
         if (filtro.IdEmpleado is { } idEmpleado)
         {
             condiciones.Add("p.ID_EMPLEADO = :idEmpleado");
@@ -52,40 +60,73 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
         }
         var where = condiciones.Count > 0 ? "WHERE " + string.Join(" AND ", condiciones) : string.Empty;
 
-        return ReadList($"""
-            SELECT p.ID_PERMISO, p.TIPO, p.ID_EMPLEADO, e.NOMBRE_EMPLEADO AS EMPLEADO, TRIM(e.NPAGO) AS NO_PAGO,
-                   p.MOTIVO, p.FECHA_INICIO, p.FECHA_FIN, p.HORA_SALIDA, p.HORA_ENTRADA,
-                   p.DIAS_HABILES, p.MINUTOS, p.FECHA_SOLICITUD,
-                   p.ESTADO, p.FECHA_REGISTRO, p.ID_AREA, a.NOMBRE AS NOMBRE_AREA,
-                   a.DEPARTAMENTO_IHSS_ID, d.DEPARTAMENTO_IHSS_DESC AS NOMBRE_DEPARTAMENTO
-            FROM PERMISO_SOLICITUD p
-            LEFT JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = p.ID_EMPLEADO
-            LEFT JOIN PERMISO_AREA a ON a.ID_AREA = p.ID_AREA
-            LEFT JOIN DEPARTAMENTO_IHSS d ON d.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID
-            {where}
-            ORDER BY p.FECHA_INICIO DESC, p.ID_PERMISO DESC
-            """, reader => new PermisoDto(
-                ReadInt(reader, "ID_PERMISO"),
-                ReadString(reader, "TIPO").Trim().ToUpperInvariant(),
-                ReadInt(reader, "ID_EMPLEADO"),
-                ReadString(reader, "EMPLEADO"),
-                ReadNullableString(reader, "NO_PAGO"),
-                ReadString(reader, "MOTIVO"),
-                ReadDate(reader, "FECHA_INICIO"),
-                ReadDate(reader, "FECHA_FIN"),
-                ReadNullableString(reader, "HORA_SALIDA"),
-                ReadNullableString(reader, "HORA_ENTRADA"),
-                ReadNullableInt(reader, "DIAS_HABILES") ?? 0,
-                ReadNullableInt(reader, "MINUTOS") ?? 0,
-                ReadNullableDate(reader, "FECHA_SOLICITUD"),
-                ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
-                ReadDate(reader, "FECHA_REGISTRO"),
-                ReadNullableInt(reader, "ID_AREA"),
-                ReadNullableString(reader, "NOMBRE_AREA"),
-                ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
-                ReadNullableString(reader, "NOMBRE_DEPARTAMENTO")),
-            cancellationToken, [.. valores]);
+        // Una sola conexión para los parámetros y los permisos (ReadList no la cierra si ya estaba abierta).
+        await DbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            var filasParametros = await ReadList(PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken);
+            var finJornada = new Dictionary<int, string>();
+            // Igual que LeerModificable: la jornada del departamento del área o, sin área, la del
+            // empleado; un parámetro mal escrito usa la jornada por defecto, como en GetSesion.
+            string FinJornada(int? idDepartamento)
+            {
+                if (idDepartamento is not { } id) return FormatoHora(PermisoParametros.PorDefecto.FinJornada);
+                if (finJornada.TryGetValue(id, out var hora)) return hora;
+                PermisoParametros parametros;
+                try
+                {
+                    parametros = PermisoParametros.Para(id, filasParametros);
+                }
+                catch (ArgumentException)
+                {
+                    parametros = PermisoParametros.PorDefecto;
+                }
+                return finJornada[id] = FormatoHora(parametros.FinJornada);
+            }
+
+            return await ReadList($"""
+                SELECT p.ID_PERMISO, p.TIPO, p.ID_EMPLEADO, e.NOMBRE_EMPLEADO AS EMPLEADO, TRIM(e.NPAGO) AS NO_PAGO,
+                       p.MOTIVO, p.FECHA_INICIO, p.FECHA_FIN, p.HORA_SALIDA, p.HORA_ENTRADA,
+                       p.DIAS_HABILES, p.MINUTOS, p.FECHA_SOLICITUD,
+                       p.ESTADO, p.FECHA_REGISTRO, p.ID_AREA, a.NOMBRE AS NOMBRE_AREA,
+                       a.DEPARTAMENTO_IHSS_ID, d.DEPARTAMENTO_IHSS_DESC AS NOMBRE_DEPARTAMENTO,
+                       COALESCE(a.DEPARTAMENTO_IHSS_ID, e.DEPARTAMENTO_IHSS_ID) AS DEPTO_JORNADA
+                FROM PERMISO_SOLICITUD p
+                LEFT JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = p.ID_EMPLEADO
+                LEFT JOIN PERMISO_AREA a ON a.ID_AREA = p.ID_AREA
+                LEFT JOIN DEPARTAMENTO_IHSS d ON d.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID
+                {where}
+                ORDER BY p.FECHA_INICIO DESC, p.ID_PERMISO DESC
+                """, reader => new PermisoDto(
+                    ReadInt(reader, "ID_PERMISO"),
+                    ReadString(reader, "TIPO").Trim().ToUpperInvariant(),
+                    ReadInt(reader, "ID_EMPLEADO"),
+                    ReadString(reader, "EMPLEADO"),
+                    ReadNullableString(reader, "NO_PAGO"),
+                    ReadString(reader, "MOTIVO"),
+                    ReadDate(reader, "FECHA_INICIO"),
+                    ReadDate(reader, "FECHA_FIN"),
+                    ReadNullableString(reader, "HORA_SALIDA"),
+                    ReadNullableString(reader, "HORA_ENTRADA"),
+                    ReadNullableInt(reader, "DIAS_HABILES") ?? 0,
+                    ReadNullableInt(reader, "MINUTOS") ?? 0,
+                    ReadNullableDate(reader, "FECHA_SOLICITUD"),
+                    ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
+                    ReadDate(reader, "FECHA_REGISTRO"),
+                    ReadNullableInt(reader, "ID_AREA"),
+                    ReadNullableString(reader, "NOMBRE_AREA"),
+                    ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
+                    ReadNullableString(reader, "NOMBRE_DEPARTAMENTO"),
+                    FinJornada(ReadNullableInt(reader, "DEPTO_JORNADA"))),
+                cancellationToken, [.. valores]);
+        }
+        finally
+        {
+            await DbContext.Database.CloseConnectionAsync();
+        }
     }
+
+    private static string FormatoHora(TimeOnly hora) => hora.ToString("HH:mm", CultureInfo.InvariantCulture);
 
     // Solo empleados activos (ESTADO = 1) de departamentos habilitados. El jefe recibe los de su
     // departamento que están en su área o todavía no tienen área; el administrador de
@@ -146,7 +187,7 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
     public Task<bool> AnularPermiso(PermisoAlcance alcance, int idPermiso, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
-            if (await LeerModificable(connection, transaction, alcance, idPermiso, "anular", cancellationToken) is null) return false;
+            if (await LeerModificable(connection, transaction, alcance, idPermiso, "anular", null, cancellationToken) is null) return false;
             await Execute(connection, transaction,
                 "UPDATE PERMISO_SOLICITUD SET ESTADO = 'ANULADO' WHERE ID_PERMISO = :idPermiso", cancellationToken,
                 ("idPermiso", idPermiso));
@@ -228,8 +269,10 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
     private Task<bool> Guardar(PermisoAlcance alcance, int? idPermiso, Solicitud nueva, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
-            await Execute(connection, transaction,
-                "LOCK TABLE PERMISO_SOLICITUD IN EXCLUSIVE MODE WAIT 10", cancellationToken);
+            await LockTable(connection, transaction, "PERMISO_SOLICITUD", cancellationToken);
+            // Jornada y límites de todos los departamentos: se leen una vez para el permiso que se
+            // edita (su fin) y para el nuevo (sus reglas).
+            var filasParametros = await ReadRows(connection, transaction, PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken);
 
             // Área con la que se guarda el permiso: al editar sin cambiar de empleado se conserva
             // la original (aunque el empleado ya esté en otra área, otro departamento o inactivo:
@@ -238,7 +281,10 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             int? idArea = null;
             if (idPermiso is { } id)
             {
-                if (await LeerModificable(connection, transaction, alcance, id, "editar", cancellationToken) is not { } actual) return false;
+                if (await LeerModificable(connection, transaction, alcance, id, "editar", filasParametros, cancellationToken) is not { } actual)
+                {
+                    return false;
+                }
                 if (actual.IdEmpleado == nueva.IdEmpleado && actual.IdArea is not null) idArea = actual.IdArea;
             }
 
@@ -256,17 +302,21 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                 await ValidarEmpleado(connection, transaction, nueva.IdEmpleado, idDepartamento, cancellationToken);
             }
 
-            var parametros = PermisoParametros.Para(idDepartamento,
-                await ReadRows(connection, transaction, PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken));
-            // Feriados de los años que toca el permiso: alcanzan para contar sus días y para el límite anual.
-            var feriados = await LeerFeriados(connection, transaction, idDepartamento,
-                new DateTime(nueva.FechaInicio.Year, 1, 1), new DateTime(nueva.FechaFin.Year + 1, 1, 1), cancellationToken);
+            var parametros = PermisoParametros.Para(idDepartamento, filasParametros);
+            // Años que toca el permiso: alcanzan para contar sus días y para los límites. Un choque
+            // o un permiso que sume al mes o al año tiene que tocar esos mismos años, así que los
+            // permisos que terminaron antes o empiezan después no hace falta leerlos.
+            var desdeAnio = new DateTime(nueva.FechaInicio.Year, 1, 1);
+            var hastaAnio = new DateTime(nueva.FechaFin.Year + 1, 1, 1);
+            var feriados = await LeerFeriados(connection, transaction, idDepartamento, desdeAnio, hastaAnio, cancellationToken);
             var existentes = await ReadRows(connection, transaction, """
                 SELECT TIPO, FECHA_INICIO, FECHA_FIN, HORA_SALIDA, HORA_ENTRADA, MINUTOS
                 FROM PERMISO_SOLICITUD
                 WHERE ID_EMPLEADO = :idEmpleado
                   AND ESTADO = 'ACTIVO'
                   AND ID_PERMISO <> :idPermiso
+                  AND FECHA_FIN >= :desdeAnio
+                  AND FECHA_INICIO < :hastaAnio
                 """, reader => new Existente(
                     ReadString(reader, "TIPO").Trim().ToUpperInvariant(),
                     ReadDate(reader, "FECHA_INICIO").Date,
@@ -274,7 +324,8 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                     PermisoParametros.TryParseHora(ReadNullableString(reader, "HORA_SALIDA")),
                     PermisoParametros.TryParseHora(ReadNullableString(reader, "HORA_ENTRADA")),
                     ReadNullableInt(reader, "MINUTOS") ?? 0),
-                cancellationToken, ("idEmpleado", nueva.IdEmpleado), ("idPermiso", idPermiso ?? 0));
+                cancellationToken, ("idEmpleado", nueva.IdEmpleado), ("idPermiso", idPermiso ?? 0),
+                ("desdeAnio", desdeAnio), ("hastaAnio", hastaAnio));
 
             var (dias, minutos) = Calcular(nueva, parametros, feriados);
             ValidarChoques(nueva, existentes);
@@ -311,7 +362,8 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                 return true;
             }
 
-            var nuevoId = await NextId(connection, transaction, "PERMISO_SOLICITUD", "ID_PERMISO", cancellationToken);
+            var nuevoId = await NextId(connection, transaction, "PERMISO_SOLICITUD", "ID_PERMISO", cancellationToken,
+                tablaBloqueada: true);
             await Execute(connection, transaction, """
                 INSERT INTO PERMISO_SOLICITUD
                     (ID_PERMISO, TIPO, ID_EMPLEADO, MOTIVO, FECHA_INICIO, FECHA_FIN,
@@ -327,13 +379,15 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
 
     // Permiso que se va a editar o anular (accion), bloqueado hasta el fin de la transacción.
     // Devuelve null si no existe o está fuera del alcance del usuario; si está anulado o ya
-    // finalizó, no se puede modificar.
+    // finalizó, no se puede modificar. filasParametros: las de PermisoParametros.Sql si quien
+    // llama ya las leyó; null para leerlas solo cuando hacen falta.
     private static async Task<PermisoActual?> LeerModificable(
         DbConnection connection,
         DbTransaction transaction,
         PermisoAlcance alcance,
         int idPermiso,
         string accion,
+        IReadOnlyCollection<PermisoParametros.Fila>? filasParametros,
         CancellationToken cancellationToken)
     {
         // La jornada que marca el fin es la del departamento del área del permiso; los permisos sin
@@ -369,8 +423,8 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
         }
 
         var parametros = actual.IdDepartamentoJornada is { } deptoJornada
-            ? PermisoParametros.Para(deptoJornada,
-                await ReadRows(connection, transaction, PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken))
+            ? PermisoParametros.Para(deptoJornada, filasParametros
+                ?? await ReadRows(connection, transaction, PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken))
             : PermisoParametros.PorDefecto;
         if (Finalizado(actual.Tipo, actual.FechaFin, actual.HoraEntrada, parametros.FinJornada, DateTime.Now))
         {
@@ -469,9 +523,6 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
 
     private static TimeOnly ParseHora(string? valor, string campo) =>
         PermisoParametros.TryParseHora(valor) ?? throw new ArgumentException($"La hora de {campo} no es válida.");
-
-    private static DateTime ReadDate(DbDataReader reader, string column) =>
-        Convert.ToDateTime(reader.GetValue(reader.GetOrdinal(column)), CultureInfo.InvariantCulture);
 
     // Departamento y estados de un área.
     private sealed record AreaDatos(int IdDepartamento, string Estado, string EstadoDepartamento);

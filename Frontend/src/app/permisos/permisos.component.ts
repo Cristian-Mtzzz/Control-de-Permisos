@@ -40,6 +40,21 @@ const emptyHora = (): SavePermisoHoraRequest => ({
   IdEmpleado: 0, Motivo: '', Fecha: '', HoraSalida: '', HoraEntrada: '', FechaSolicitud: today(),
 });
 
+// Último resultado de un cálculo y las dependencias con que se hizo. Los getters de la plantilla
+// se evalúan en cada detección de cambios; así solo se recalculan cuando cambia alguna
+// dependencia. Las listas (permisos, empleados, sesión) se reemplazan al cargar, nunca se mutan.
+function memo<T>(calcular: () => T): (dependencias: readonly unknown[]) => T {
+  let previas: readonly unknown[] | null = null;
+  let valor!: T;
+  return (dependencias) => {
+    if (!previas || dependencias.some((dependencia, index) => !Object.is(dependencia, previas![index]))) {
+      valor = calcular();
+      previas = dependencias;
+    }
+    return valor;
+  };
+}
+
 @Component({
   selector: 'app-permisos',
   imports: [
@@ -123,10 +138,26 @@ export class PermisosComponent {
     inject(DestroyRef).onDestroy(() => clearInterval(timer));
   }
 
-  // Estado que se muestra: el permiso activo cuyo fin ya pasó se ve como finalizado.
+  // Estado que se muestra: el permiso activo cuyo fin ya pasó se ve como finalizado. El cierre de
+  // la jornada lo manda la API con cada permiso (el mismo con que valida editar y anular); se
+  // guarda por permiso hasta que cambia la hora o la sesión.
   estado(permiso: Permiso): PermisoEstadoVista {
-    return estadoVista(permiso, this.now, this.jornada(permiso.IdDepartamento).HoraFinJornada);
+    if (this.estadosCacheHora !== this.now || this.estadosCacheSesion !== this.sesion) {
+      this.estadosCache = new WeakMap();
+      this.estadosCacheHora = this.now;
+      this.estadosCacheSesion = this.sesion;
+    }
+    let estado = this.estadosCache.get(permiso);
+    if (estado === undefined) {
+      estado = estadoVista(permiso, this.now, permiso.HoraFinJornada ?? this.jornada(permiso.IdDepartamento).HoraFinJornada);
+      this.estadosCache.set(permiso, estado);
+    }
+    return estado;
   }
+
+  private estadosCache = new WeakMap<Permiso, PermisoEstadoVista>();
+  private estadosCacheHora: Date | null = null;
+  private estadosCacheSesion: PermisoSesion | null = null;
 
   // Para el reporte: el mismo estado de la tabla.
   private readonly estadoDe = (permiso: Permiso): PermisoEstadoVista => this.estado(permiso);
@@ -212,10 +243,13 @@ export class PermisosComponent {
   }
 
   jornada(idDepartamento: number | null | undefined): PermisoJornada {
-    return this.sesion?.Departamentos.find((departamento) => departamento.IdDepartamento === idDepartamento)
+    return (idDepartamento != null ? this.departamentosPorId([this.sesion]).get(idDepartamento) : undefined)
       ?? this.sesion?.Departamentos[0]
       ?? JORNADA_POR_DEFECTO;
   }
+
+  private readonly departamentosPorId = memo(() =>
+    new Map((this.sesion?.Departamentos ?? []).map((departamento) => [departamento.IdDepartamento, departamento])));
 
   private departamentoNombre(idDepartamento: number): string | undefined {
     return this.sesion?.Departamentos.find((departamento: PermisoDepartamento) => departamento.IdDepartamento === idDepartamento)?.Nombre;
@@ -231,7 +265,8 @@ export class PermisosComponent {
 
   // ---- Indicadores ---------------------------------------------------------------------
 
-  private get enAlcance(): Permiso[] { return this.filtrarAlcance(this.permisos); }
+  private get enAlcance(): Permiso[] { return this.enAlcanceMemo([this.permisos, this.deptoFilter, this.areaFilter]); }
+  private readonly enAlcanceMemo = memo(() => this.filtrarAlcance(this.permisos));
 
   // Permisos del departamento y el área elegidos en los filtros de la pantalla.
   private filtrarAlcance(permisos: Permiso[]): Permiso[] {
@@ -240,7 +275,8 @@ export class PermisosComponent {
       && (this.areaFilter === 0 || permiso.IdArea === this.areaFilter));
   }
 
-  private get activos(): Permiso[] { return this.enAlcance.filter(isActive); }
+  private get activos(): Permiso[] { return this.activosMemo([this.enAlcance]); }
+  private readonly activosMemo = memo(() => this.enAlcance.filter(isActive));
 
   get totalActivos(): number { return this.activos.length; }
 
@@ -262,7 +298,15 @@ export class PermisosComponent {
 
   // ---- Tabla ---------------------------------------------------------------------------
 
+  // La plantilla lo lee tres veces por ciclo (vacío, filas y paginación).
   get filteredPermisos(): Permiso[] {
+    return this.filteredMemo([
+      this.enAlcance, this.searchTerm, this.tipoFilter, this.estadoFilter, this.fechaDesde, this.fechaHasta,
+      this.now, this.sesion,
+    ]);
+  }
+
+  private readonly filteredMemo = memo((): Permiso[] => {
     const term = this.searchTerm.trim().toUpperCase();
     return this.enAlcance.filter((permiso) =>
       (!this.tipoFilter || permiso.Tipo === this.tipoFilter)
@@ -274,7 +318,7 @@ export class PermisosComponent {
         || permiso.Motivo.toUpperCase().includes(term)
         || (permiso.NoPago ?? '').includes(term)
         || String(permiso.IdPermiso) === term));
-  }
+  });
 
   updateSearch(term: string): void {
     this.searchTerm = term;
@@ -720,9 +764,10 @@ export class PermisosComponent {
     }
     this.isExporting = true;
     try {
-      // Con un solo empleado la API ya trae solo los suyos; con varios se filtran aquí.
+      // La API trae solo el rango; con un solo empleado, solo los suyos (con varios se filtran aquí).
       const idEmpleado = filtros.idsEmpleado.length === 1 ? filtros.idsEmpleado[0] : undefined;
-      const delRango = await firstValueFrom(this.permisosService.getPermisos({ desde: filtros.desde, idEmpleado }));
+      const delRango = await firstValueFrom(
+        this.permisosService.getPermisos({ desde: filtros.desde, hasta: filtros.hasta, idEmpleado }));
       const permisos = filterPermisosForReport(this.filtrarAlcance(delRango), filtros, this.estadoDe);
       const nombres = filtros.idsEmpleado.map((id) =>
         this.empleados.find((item) => item.IdEmpleado === id)?.NombreCompleto

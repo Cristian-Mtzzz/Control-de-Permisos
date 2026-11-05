@@ -31,6 +31,9 @@ export interface Permiso {
   NombreArea: string | null;
   IdDepartamento: number | null;
   NombreDepartamento: string | null;
+  // Cierre de la jornada (HH:mm) con que la API decide si un permiso por día ya finalizó: la
+  // del departamento del área o, sin área, la del departamento del empleado.
+  HoraFinJornada?: string;
 }
 
 // Empleado activo de un departamento habilitado, con su área (null = todavía sin área).

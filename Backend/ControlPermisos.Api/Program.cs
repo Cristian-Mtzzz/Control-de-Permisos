@@ -60,8 +60,8 @@ builder.Services.AddLoginProtection();
 
 var allowedOrigins = new List<string>
 {
-    "http://localhost:4300",
-    "http://127.0.0.1:4300",
+    "http://localhost:50307",
+    "http://127.0.0.1:50307",
     "http://10.1.22.55",
 };
 

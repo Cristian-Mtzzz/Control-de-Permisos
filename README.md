@@ -70,7 +70,7 @@ otra base de datos).
 | Parte | Comandos | Dirección |
 | --- | --- | --- |
 | API | `cd Backend/ControlPermisos.Api` y `dotnet run` | http://localhost:5080 (Swagger en `/swagger`) |
-| Frontend | `cd Frontend`, `npm ci` la primera vez y `npm start` | http://localhost:4300 |
+| Frontend | `cd Frontend`, `npm ci` la primera vez y `npm start` | http://localhost:50307 |
 
 El frontend en desarrollo reenvía `/api` a la API local (`proxy.conf.json`).
 

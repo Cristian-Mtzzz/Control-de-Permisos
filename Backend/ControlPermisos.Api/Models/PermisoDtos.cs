@@ -8,6 +8,8 @@ namespace ControlPermisos.Api.Models;
 /// Permiso tal como lo muestra la tabla. En el permiso por hora FechaInicio y FechaFin son
 /// la misma fecha; DiasHabiles es 0 en los de hora y Minutos es 0 en los de día.
 /// IdArea es el área del empleado cuando se registró el permiso; el departamento es el de esa área.
+/// HoraFinJornada (HH:mm) es el cierre de la jornada con que la API decide si un permiso por día
+/// ya finalizó: la del departamento del área o, sin área, la del departamento del empleado.
 /// </summary>
 public sealed record PermisoDto(
     int IdPermiso,
@@ -28,7 +30,8 @@ public sealed record PermisoDto(
     int? IdArea,
     string? NombreArea,
     int? IdDepartamento,
-    string? NombreDepartamento);
+    string? NombreDepartamento,
+    string HoraFinJornada);
 
 /// <summary>Empleado activo de un departamento habilitado, con su área (null = sin área).</summary>
 public sealed record PermisoEmpleadoDto(
@@ -171,4 +174,7 @@ public static class PermisoValores
     public const string NivelConsulta = "CONSULTA";
 
     public static readonly string[] Niveles = [NivelAdmin, NivelAdminDepartamento, NivelJefe, NivelConsulta];
+
+    // Dominios de Active Directory que admite USUARIOS.DOMINIOP.
+    public static readonly string[] Dominios = ["BA", "HE", "HRN", "IVM"];
 }

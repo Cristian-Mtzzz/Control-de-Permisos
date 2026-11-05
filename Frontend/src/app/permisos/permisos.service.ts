@@ -20,11 +20,12 @@ export class PermisosService {
     return this.httpClient.get<unknown>(`${API_PERMISOS_URL}/sesion`).pipe(map((body) => toPascalCase<PermisoSesion>(body)));
   }
 
-  // desde (yyyy-mm-dd): los permisos que terminan ese día o después; idEmpleado: los de un
-  // empleado. Sin filtros llega todo el historial del alcance.
-  getPermisos(filtro: { desde?: string; idEmpleado?: number } = {}): Observable<Permiso[]> {
+  // desde (yyyy-mm-dd): los permisos que terminan ese día o después; hasta: los que empiezan ese
+  // día o antes; idEmpleado: los de un empleado. Sin filtros llega todo el historial del alcance.
+  getPermisos(filtro: { desde?: string; hasta?: string; idEmpleado?: number } = {}): Observable<Permiso[]> {
     const params: Record<string, string> = {};
     if (filtro.desde) params['desde'] = filtro.desde;
+    if (filtro.hasta) params['hasta'] = filtro.hasta;
     if (filtro.idEmpleado) params['idEmpleado'] = String(filtro.idEmpleado);
     return this.httpClient.get<unknown>(API_PERMISOS_URL, { params }).pipe(map((body) => toPascalCase<Permiso[]>(body)));
   }

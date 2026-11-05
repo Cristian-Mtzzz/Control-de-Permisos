@@ -32,9 +32,10 @@ public sealed class AuthController(
         LoginRequestDto loginRequest,
         CancellationToken cancellationToken)
     {
+        LoginLimits? limits = null;
         try
         {
-            var limits = await loginLimits.GetAsync(cancellationToken);
+            limits = await loginLimits.GetAsync(cancellationToken);
             var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "desconocido";
             if (!loginAttempts.TryRegisterIpAttempt(ipAddress, limits))
             {
@@ -62,8 +63,7 @@ public sealed class AuthController(
         {
             // Credenciales correctas, pero la cuenta no tiene nivel en el Control de permisos. Cuenta
             // como un fallo más: si reiniciara el contador, el bloqueo también delataría la contraseña.
-            var limits = await loginLimits.GetAsync(cancellationToken);
-            loginAttempts.RegisterFailure(loginRequest.UserName, limits);
+            loginAttempts.RegisterFailure(loginRequest.UserName, limits ?? await loginLimits.GetAsync(cancellationToken));
             logger.LogWarning("Login de {UserName} sin acceso al Control de permisos: {Motivo}", loginRequest.UserName, denied.Message);
             return Unauthorized(new { Message = LoginRechazado });
         }

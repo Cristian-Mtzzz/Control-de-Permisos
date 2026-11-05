@@ -86,7 +86,7 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "port": 4300
+            "port": 50307
           }
         },
         "test": {

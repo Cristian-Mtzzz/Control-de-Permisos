@@ -15,15 +15,23 @@ export interface ApiError {
   message?: string;
 }
 
+// Convierte sobre el mismo objeto, sin copiarlo: cada respuesta HTTP es un objeto nuevo y, como
+// la API ya responde en PascalCase, lo normal es que no haya ninguna clave que cambiar.
 export function toPascalCase<T>(value: unknown): T {
-  if (Array.isArray(value)) return value.map((item) => toPascalCase(item)) as T;
+  if (Array.isArray(value)) {
+    for (let index = 0; index < value.length; index++) value[index] = toPascalCase(value[index]);
+    return value as T;
+  }
   if (value === null || typeof value !== 'object') return value as T;
 
-  const result: Record<string, unknown> = {};
-  for (const [key, item] of Object.entries(value)) {
-    result[key.charAt(0).toUpperCase() + key.slice(1)] = toPascalCase(item);
+  const record = value as Record<string, unknown>;
+  for (const key of Object.keys(record)) {
+    const item = toPascalCase(record[key]);
+    const pascalKey = key.charAt(0).toUpperCase() + key.slice(1);
+    if (pascalKey !== key) delete record[key];
+    record[pascalKey] = item;
   }
-  return result as T;
+  return record as T;
 }
 
 // Mensaje para el usuario a partir de un error HTTP: primero el Message de la API,

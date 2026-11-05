@@ -68,8 +68,16 @@ public sealed class PermisosControllerTests
     [Fact]
     public async Task FiltrarPorUnEmpleadoInvalidoSeRechaza()
     {
-        var result = await Controller.GetPermisos(null, 0, default);
+        var result = await Controller.GetPermisos(null, null, 0, default);
         Assert.IsType<BadRequestObjectResult>(result.Result);
+    }
+
+    [Fact]
+    public async Task FiltrarConHastaAnteriorADesdeSeRechaza()
+    {
+        var result = await Controller.GetPermisos(DateTime.Today, DateTime.Today.AddDays(-1), null, default);
+        var badRequest = Assert.IsType<BadRequestObjectResult>(result.Result);
+        Assert.Contains("posterior", badRequest.Value?.GetType().GetProperty("Message")?.GetValue(badRequest.Value) as string);
     }
 
     [Fact]

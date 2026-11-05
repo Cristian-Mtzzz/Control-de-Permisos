@@ -19,23 +19,28 @@ namespace ControlPermisos.Api.Controllers;
 public sealed class PermisosController(IPermisoService permisoService, IPermisoAreaService areaService) : ControllerBase
 {
     private const string PermisoNotFound = "No se encontró el permiso indicado.";
-    private static readonly string[] Dominios = ["BA", "HE", "HRN", "IVM"];
 
     [HttpGet("sesion")]
     public async Task<ActionResult<PermisoSesionDto>> GetSesion(CancellationToken cancellationToken) =>
         Ok(await areaService.GetSesion(await Alcance(cancellationToken), cancellationToken));
 
-    // ?desde=yyyy-MM-dd deja los permisos que terminan ese día o después; ?idEmpleado=, los de un
-    // empleado. Sin filtros devuelve todo el historial del alcance (lo usa el reporte completo).
+    // ?desde=yyyy-MM-dd deja los permisos que terminan ese día o después; ?hasta=yyyy-MM-dd, los
+    // que empiezan ese día o antes; ?idEmpleado=, los de un empleado. Sin filtros devuelve todo el
+    // historial del alcance.
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<PermisoDto>>> GetPermisos(
         [FromQuery] DateTime? desde,
+        [FromQuery] DateTime? hasta,
         [FromQuery] int? idEmpleado,
         CancellationToken cancellationToken)
     {
         if (idEmpleado is <= 0) return BadRequest(new { Message = "El empleado no es válido." });
+        if (desde is { } inicio && hasta is { } fin && fin.Date < inicio.Date)
+        {
+            return BadRequest(new { Message = "La fecha \"desde\" no puede ser posterior a la fecha \"hasta\"." });
+        }
         return Ok(await permisoService.GetPermisos(
-            await Alcance(cancellationToken), new PermisoFiltro(desde, idEmpleado), cancellationToken));
+            await Alcance(cancellationToken), new PermisoFiltro(desde, hasta, idEmpleado), cancellationToken));
     }
 
     [HttpGet("empleados")]
@@ -304,7 +309,7 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
             return "Selecciona el departamento que administra.";
         }
         if (jefe.Dominio is not 0 and not 1) return "El tipo de autenticación debe ser de dominio o local.";
-        if (!Dominios.Contains(jefe.DominioP?.Trim().ToUpperInvariant())) return "El dominio debe ser BA, HE, HRN o IVM.";
+        if (!PermisoValores.Dominios.Contains(jefe.DominioP?.Trim().ToUpperInvariant())) return "El dominio debe ser BA, HE, HRN o IVM.";
         return jefe.Estado is null || jefe.Estado.Trim().ToUpperInvariant() is PermisoValores.Activo or PermisoValores.Inactivo
             ? null
             : "El estado debe ser ACTIVO o INACTIVO.";

@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, NgZone, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { fromEvent, merge, throttleTime } from 'rxjs';
@@ -19,7 +19,11 @@ export class App {
       takeUntilDestroyed(),
     ).subscribe((event) => this.authService.handleStorageChange(event.key, event.newValue));
 
-    merge(
+    // Fuera de Angular: dentro, cada movimiento del mouse volvería a calcular toda la pantalla
+    // (el throttleTime solo limita la llamada, no la detección de cambios del evento). Registrar
+    // la actividad no cambia nada en pantalla; si la sesión vence, AuthService vuelve a Angular.
+    const destroyed = takeUntilDestroyed();
+    inject(NgZone).runOutsideAngular(() => merge(
       fromEvent(document, 'pointerdown'),
       fromEvent(document, 'pointermove'),
       fromEvent(document, 'keydown'),
@@ -28,7 +32,7 @@ export class App {
       fromEvent(document, 'wheel'),
     ).pipe(
       throttleTime(1000),
-      takeUntilDestroyed(),
-    ).subscribe(() => this.authService.recordActivity());
+      destroyed,
+    ).subscribe(() => this.authService.recordActivity()));
   }
 }

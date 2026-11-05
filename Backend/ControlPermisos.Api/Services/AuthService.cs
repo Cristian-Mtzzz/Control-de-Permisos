@@ -1,4 +1,3 @@
-using System.Data;
 using System.Data.Common;
 using System.DirectoryServices;
 using System.Globalization;
@@ -21,10 +20,8 @@ public sealed class AuthService(
     PermisosDbContext dbContext,
     IPermisoAreaService areaService,
     IConfiguration configuration,
-    ILogger<AuthService> logger) : IAuthService
+    ILogger<AuthService> logger) : OracleRepository(dbContext), IAuthService
 {
-    private static readonly string[] Dominios = ["BA", "HE", "HRN", "IVM"];
-
     // Claim con el inicio de sesión en segundos Unix. Nombre propio para que el mapeo de claims
     // de JwtBearer no lo renombre (como hace con "auth_time").
     public const string SessionStartClaim = "session_start";
@@ -37,7 +34,7 @@ public sealed class AuthService(
         if (credenciales is null) return null;
 
         // Credenciales correctas: además debe tener un nivel vigente (si no, UnauthorizedAccessException
-        // con el motivo, que el controlador devuelve como 403).
+        // con el motivo, que el controlador registra en el log y responde con el mismo 401 del login rechazado).
         var alcance = await areaService.GetAlcance(credenciales.User.UserId, cancellationToken);
         logger.LogInformation("Login aceptado para {UserName} con nivel {Nivel}.", loginRequest.UserName, alcance.Nivel);
         var user = credenciales.User;
@@ -55,25 +52,24 @@ public sealed class AuthService(
     // Directory y la local contra el hash guardado. null si algo no coincide.
     private async Task<Credenciales?> VerificarCredenciales(LoginRequestDto loginRequest, CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        var connection = DbContext.Database.GetDbConnection();
+        await DbContext.Database.OpenConnectionAsync(cancellationToken);
 
         try
         {
-            await using var command = CreateCommand(connection);
             // Los usuarios locales se buscan tal como se escriben. Los de dominio, como en Active Directory,
             // sin distinguir mayúsculas ni espacios y aceptando "usuario", "DOMINIO\usuario" o "usuario@dominio".
-            command.CommandText = """
+            await using var command = CreateCommand(connection, null, """
                 SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA, PASSWORD_HASH, DOMINIOP, DOMINIO, CLAVE_SEGURA
                 FROM USUARIOS
                 WHERE (USUARIO = :userName OR (DOMINIO = 1 AND LOWER(TRIM(USUARIO)) = :domainUserName))
                   AND UPPER(ESTADO) = 'ACTIVO'
                   AND (FECHA_EXPIRACION IS NULL OR FECHA_EXPIRACION >= TRUNC(SYSDATE))
                 ORDER BY CASE WHEN USUARIO = :exactUserName THEN 0 ELSE 1 END
-                """;
-            AddParameter(command, "userName", loginRequest.UserName);
-            AddParameter(command, "domainUserName", NormalizeDomainUserName(loginRequest.UserName));
-            AddParameter(command, "exactUserName", loginRequest.UserName);
+                """,
+                ("userName", loginRequest.UserName),
+                ("domainUserName", NormalizeDomainUserName(loginRequest.UserName)),
+                ("exactUserName", loginRequest.UserName));
 
             User user;
             int domain;
@@ -93,19 +89,19 @@ public sealed class AuthService(
 
                 user = new User
                 {
-                    UserId = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("ID_USUARIO"))),
+                    UserId = ReadInt(reader, "ID_USUARIO"),
                     UserName = ReadString(reader, "USUARIO"),
                     FullName = ReadString(reader, "NOMBRE_PERSONA"),
                     PasswordHash = ReadString(reader, "PASSWORD_HASH"),
                 };
-                domain = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("DOMINIO")));
+                domain = ReadInt(reader, "DOMINIO");
                 domainName = ReadString(reader, "DOMINIOP").Trim().ToUpperInvariant();
                 secureKey = ReadString(reader, "CLAVE_SEGURA");
             }
 
             if (domain == 1)
             {
-                if (!Dominios.Contains(domainName))
+                if (!PermisoValores.Dominios.Contains(domainName))
                 {
                     logger.LogWarning(
                         "El usuario {UserName} tiene un dominio no reconocido: {DomainName}.",
@@ -134,7 +130,7 @@ public sealed class AuthService(
         }
         finally
         {
-            await dbContext.Database.CloseConnectionAsync();
+            await DbContext.Database.CloseConnectionAsync();
         }
     }
 
@@ -198,17 +194,13 @@ public sealed class AuthService(
 
         try
         {
-            await using var command = CreateCommand(connection);
-            command.CommandText = """
+            await Execute(connection, null, """
                 UPDATE USUARIOS
                 SET PASSWORD_HASH = :newHash
                 WHERE ID_USUARIO = :userId
                   AND PASSWORD_HASH = :oldHash
-                """;
-            AddParameter(command, "newHash", PasswordHashing.Hash(password));
-            AddParameter(command, "userId", user.UserId);
-            AddParameter(command, "oldHash", user.PasswordHash);
-            await command.ExecuteNonQueryAsync(cancellationToken);
+                """, cancellationToken,
+                ("newHash", PasswordHashing.Hash(password)), ("userId", user.UserId), ("oldHash", user.PasswordHash));
         }
         catch (OracleException exception)
         {
@@ -224,38 +216,30 @@ public sealed class AuthService(
         DbConnection connection,
         int userId,
         string password,
-        CancellationToken cancellationToken)
-    {
-        await using var command = CreateCommand(connection);
-        command.CommandText = """
+        CancellationToken cancellationToken) =>
+        await GetScalar<int>(connection, null, """
             SELECT COUNT(*) FROM USUARIOS
             WHERE ID_USUARIO = :userId
               AND PASSWORD_HASH = ORA_HASH(:password, 4294967295) || ORA_HASH(USUARIO, 4294967295)
-            """;
-        AddParameter(command, "userId", userId);
-        AddParameter(command, "password", password);
-        return Convert.ToInt32(await command.ExecuteScalarAsync(cancellationToken)) == 1;
-    }
+            """, cancellationToken, ("userId", userId), ("password", password)) == 1;
 
     public async Task<bool> ChangeInitialPassword(
         int userId,
         ChangePasswordDto request,
         CancellationToken cancellationToken)
     {
-        var connection = dbContext.Database.GetDbConnection();
-        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        var connection = DbContext.Database.GetDbConnection();
+        await DbContext.Database.OpenConnectionAsync(cancellationToken);
         try
         {
             string currentHash;
-            await using (var select = CreateCommand(connection))
+            await using (var select = CreateCommand(connection, null, """
+                SELECT PASSWORD_HASH FROM USUARIOS
+                WHERE ID_USUARIO = :userId
+                  AND DOMINIO = 0
+                  AND CLAVE_SEGURA = '0'
+                """, ("userId", userId)))
             {
-                select.CommandText = """
-                    SELECT PASSWORD_HASH FROM USUARIOS
-                    WHERE ID_USUARIO = :userId
-                      AND DOMINIO = 0
-                      AND CLAVE_SEGURA = '0'
-                    """;
-                AddParameter(select, "userId", userId);
                 await using var reader = await select.ExecuteReaderAsync(cancellationToken);
                 if (!await reader.ReadAsync(cancellationToken)) return false;
                 currentHash = ReadString(reader, "PASSWORD_HASH");
@@ -266,8 +250,7 @@ public sealed class AuthService(
                 : await MatchesLegacyHash(connection, userId, request.CurrentPassword, cancellationToken);
             if (!currentIsValid) return false;
 
-            await using var update = CreateCommand(connection);
-            update.CommandText = """
+            return await Execute(connection, null, """
                 UPDATE USUARIOS
                 SET PASSWORD_HASH = :newHash,
                     CLAVE_SEGURA = '1'
@@ -275,15 +258,12 @@ public sealed class AuthService(
                   AND DOMINIO = 0
                   AND CLAVE_SEGURA = '0'
                   AND PASSWORD_HASH = :currentHash
-                """;
-            AddParameter(update, "newHash", PasswordHashing.Hash(request.NewPassword));
-            AddParameter(update, "userId", userId);
-            AddParameter(update, "currentHash", currentHash);
-            return await update.ExecuteNonQueryAsync(cancellationToken) == 1;
+                """, cancellationToken,
+                ("newHash", PasswordHashing.Hash(request.NewPassword)), ("userId", userId), ("currentHash", currentHash)) == 1;
         }
         finally
         {
-            await dbContext.Database.CloseConnectionAsync();
+            await DbContext.Database.CloseConnectionAsync();
         }
     }
 
@@ -301,19 +281,17 @@ public sealed class AuthService(
 
         User user;
         bool mustChangePassword;
-        var connection = dbContext.Database.GetDbConnection();
-        await dbContext.Database.OpenConnectionAsync(cancellationToken);
+        var connection = DbContext.Database.GetDbConnection();
+        await DbContext.Database.OpenConnectionAsync(cancellationToken);
         try
         {
-            await using var command = CreateCommand(connection);
-            command.CommandText = """
+            await using var command = CreateCommand(connection, null, """
                 SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA, DOMINIO, CLAVE_SEGURA
                 FROM USUARIOS
                 WHERE ID_USUARIO = :userId
                   AND UPPER(ESTADO) = 'ACTIVO'
                   AND (FECHA_EXPIRACION IS NULL OR FECHA_EXPIRACION >= TRUNC(SYSDATE))
-                """;
-            AddParameter(command, "userId", userId);
+                """, ("userId", userId));
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);
             if (!await reader.ReadAsync(cancellationToken))
             {
@@ -323,16 +301,15 @@ public sealed class AuthService(
 
             user = new User
             {
-                UserId = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("ID_USUARIO"))),
+                UserId = ReadInt(reader, "ID_USUARIO"),
                 UserName = ReadString(reader, "USUARIO"),
                 FullName = ReadString(reader, "NOMBRE_PERSONA"),
             };
-            var domain = Convert.ToInt32(reader.GetValue(reader.GetOrdinal("DOMINIO")));
-            mustChangePassword = domain == 0 && ReadString(reader, "CLAVE_SEGURA") == "0";
+            mustChangePassword = ReadInt(reader, "DOMINIO") == 0 && ReadString(reader, "CLAVE_SEGURA") == "0";
         }
         finally
         {
-            await dbContext.Database.CloseConnectionAsync();
+            await DbContext.Database.CloseConnectionAsync();
         }
 
         try
@@ -353,32 +330,6 @@ public sealed class AuthService(
     // La sesión empezó en el pasado (un reloj adelantado no la extiende) y no superó la duración máxima.
     internal static bool SesionVigente(DateTimeOffset inicio, DateTimeOffset ahora, TimeSpan maxima) =>
         inicio <= ahora && ahora - inicio < maxima;
-
-    private static DbCommand CreateCommand(DbConnection connection)
-    {
-        var command = connection.CreateCommand();
-        if (command is OracleCommand oracleCommand) oracleCommand.BindByName = true;
-        return command;
-    }
-
-    private static void AddParameter(DbCommand command, string name, string value)
-    {
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = name;
-        parameter.DbType = DbType.String;
-        parameter.Size = 256;
-        parameter.Value = value;
-        command.Parameters.Add(parameter);
-    }
-
-    private static void AddParameter(DbCommand command, string name, int value)
-    {
-        var parameter = command.CreateParameter();
-        parameter.ParameterName = name;
-        parameter.DbType = DbType.Int32;
-        parameter.Value = value;
-        command.Parameters.Add(parameter);
-    }
 
     // sessionStart es el inicio de sesión: se conserva al renovar para aplicar la duración máxima.
     private string GenerateToken(User user, bool mustChangePassword, DateTimeOffset sessionStart)
@@ -408,12 +359,6 @@ public sealed class AuthService(
             signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
-    }
-
-    private static string ReadString(DbDataReader reader, string column)
-    {
-        var ordinal = reader.GetOrdinal(column);
-        return reader.IsDBNull(ordinal) ? string.Empty : Convert.ToString(reader.GetValue(ordinal)) ?? string.Empty;
     }
 
     private sealed record Credenciales(User User, bool MustChangePassword);

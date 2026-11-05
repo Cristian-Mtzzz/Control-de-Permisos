@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Injectable, inject, signal } from '@angular/core';
+import { Injectable, NgZone, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { EMPTY, Observable, catchError, finalize, tap } from 'rxjs';
 import { apiUrl } from '../api-url';
@@ -21,6 +21,7 @@ const LAST_ACTIVITY_KEY = 'control_permisos_last_activity';
 export class AuthService {
   private readonly httpClient = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly zone = inject(NgZone);
   private inactivityTimer: ReturnType<typeof setTimeout> | null = null;
   private tokenRefreshInFlight = false;
 
@@ -179,8 +180,12 @@ export class AuthService {
     }
   }
 
+  // La actividad se registra fuera de Angular (App), y con ella el temporizador de inactividad
+  // y la renovación del token: al vencer, se vuelve a Angular para que la pantalla cambie.
   private expireSession(): void {
-    this.logout();
-    void this.router.navigateByUrl('/login');
+    this.zone.run(() => {
+      this.logout();
+      void this.router.navigateByUrl('/login');
+    });
   }
 }

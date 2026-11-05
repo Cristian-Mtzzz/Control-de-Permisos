@@ -44,10 +44,11 @@ public sealed record PermisoAlcance(int IdUsuario, string Nivel, int? IdDepartam
 }
 
 /// <summary>
-/// Filtro de la lista de permisos. Desde: los que terminan ese día o después. IdEmpleado: solo
-/// los de ese empleado. Vacío = sin límite (siempre dentro del alcance del usuario).
+/// Filtro de la lista de permisos. Desde: los que terminan ese día o después. Hasta: los que
+/// empiezan ese día o antes. IdEmpleado: solo los de ese empleado. Vacío = sin límite (siempre
+/// dentro del alcance del usuario).
 /// </summary>
-public sealed record PermisoFiltro(DateTime? Desde, int? IdEmpleado);
+public sealed record PermisoFiltro(DateTime? Desde, DateTime? Hasta, int? IdEmpleado);
 
 // Contrato del Control de permisos: permisos y personal de cada área.
 public interface IPermisoService

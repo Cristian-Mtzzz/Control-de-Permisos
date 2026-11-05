@@ -131,18 +131,28 @@ public abstract class OracleRepository(PermisosDbContext dbContext)
     // Calcula el siguiente identificador con MAX + 1 de forma segura: bloquea la tabla
     // hasta el commit para que dos solicitudes simultáneas no obtengan el mismo valor.
     // Debe llamarse dentro de InTransaction. Tabla y columna son constantes internas.
+    // tablaBloqueada: quien llama ya bloqueó la tabla en esta transacción (LockTable).
     protected static async Task<int> NextId(
         DbConnection connection,
         DbTransaction transaction,
         string table,
         string idColumn,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        bool tablaBloqueada = false)
     {
-        await Execute(connection, transaction,
-            $"LOCK TABLE {table} IN EXCLUSIVE MODE WAIT {TableLockWaitSeconds}", cancellationToken);
+        if (!tablaBloqueada) await LockTable(connection, transaction, table, cancellationToken);
         return await GetScalar<int>(connection, transaction,
             $"SELECT NVL(MAX({idColumn}), 0) + 1 FROM {table}", cancellationToken);
     }
+
+    // Bloquea la tabla hasta el commit; falla con ORA-30006 si otro la tiene más de TableLockWaitSeconds.
+    protected static Task<int> LockTable(
+        DbConnection connection,
+        DbTransaction transaction,
+        string table,
+        CancellationToken cancellationToken) =>
+        Execute(connection, transaction,
+            $"LOCK TABLE {table} IN EXCLUSIVE MODE WAIT {TableLockWaitSeconds}", cancellationToken);
 
     // Lectura dentro de una transacción abierta (ReadList abre su propia conexión).
     protected static async Task<List<T>> ReadRows<T>(
@@ -213,6 +223,9 @@ public abstract class OracleRepository(PermisosDbContext dbContext)
         var ordinal = reader.GetOrdinal(column);
         return reader.IsDBNull(ordinal) ? null : Convert.ToInt32(reader.GetValue(ordinal));
     }
+
+    protected static DateTime ReadDate(DbDataReader reader, string column) =>
+        Convert.ToDateTime(reader.GetValue(reader.GetOrdinal(column)), CultureInfo.InvariantCulture);
 
     protected static DateTime? ReadNullableDate(DbDataReader reader, string column)
     {

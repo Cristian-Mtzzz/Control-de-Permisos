@@ -1,5 +1,6 @@
 using System.Data.Common;
 using System.Globalization;
+using Microsoft.EntityFrameworkCore;
 using ControlPermisos.Api.Data;
 using ControlPermisos.Api.Models;
 
@@ -21,6 +22,11 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
     private const string ConAccesoSql = """
         (u.ROL = 'Permisos' OR u.PERMISO_ADMIN = 1 OR u.PERMISO_CONSULTA = 1
          OR u.ID_DEPTO_PERMISO IS NOT NULL OR u.ID_AREA_PERMISO IS NOT NULL)
+        """;
+    // Cuenta que puede iniciar sesión hoy: activa y sin vencer (la misma condición del login).
+    // Las vencidas no cuentan como jefes o administradores activos.
+    private const string VigenteSql = """
+        UPPER(u.ESTADO) = 'ACTIVO' AND (u.FECHA_EXPIRACION IS NULL OR u.FECHA_EXPIRACION >= TRUNC(SYSDATE))
         """;
 
     // Se lee en cada solicitud para que un cambio de nivel, área o departamento aplique de
@@ -82,87 +88,98 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
     {
         var filtroDepto = alcance.VeTodo ? string.Empty : "WHERE pd.DEPARTAMENTO_IHSS_ID = :alcanceDepto";
         (string Name, object? Value)[] parametrosDepto = alcance.VeTodo ? [] : [("alcanceDepto", alcance.IdDepartamento)];
-        var filas = await ReadList(PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken);
-        var anio = DateTime.Today.Year;
-        var feriados = await ReadList("""
-            SELECT DEPARTAMENTO_IHSS_ID, FECHA FROM PERMISO_FERIADO
-            WHERE FECHA >= :desde AND FECHA < :hasta
-            ORDER BY FECHA
-            """, reader => (
-                IdDepartamento: ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
-                Fecha: Convert.ToDateTime(reader.GetValue(reader.GetOrdinal("FECHA")), CultureInfo.InvariantCulture)
-                    .ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
-            cancellationToken, ("desde", new DateTime(anio - 1, 1, 1)), ("hasta", new DateTime(anio + 2, 1, 1)));
-        var departamentos = await ReadList($"""
-            SELECT pd.DEPARTAMENTO_IHSS_ID, d.DEPARTAMENTO_IHSS_DESC AS NOMBRE, pd.ESTADO,
-                   (SELECT COUNT(*) FROM PERMISO_AREA a
-                    WHERE a.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID AND a.ESTADO = 'ACTIVO') AS AREAS,
-                   (SELECT COUNT(*) FROM EMPLEADOS_IHSS e
-                    WHERE e.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID AND e.ESTADO = 1) AS EMPLEADOS
-            FROM PERMISO_DEPARTAMENTO pd
-            JOIN DEPARTAMENTO_IHSS d ON d.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID
-            {filtroDepto}
-            ORDER BY UPPER(d.DEPARTAMENTO_IHSS_DESC)
-            """, reader =>
-            {
-                var idDepartamento = ReadInt(reader, "DEPARTAMENTO_IHSS_ID");
-                // Un parámetro mal escrito no debe dejar sin pantalla a todos: se muestra la jornada
-                // por defecto con un aviso. Registrar en ese departamento sigue fallando con el
-                // mismo mensaje hasta que se corrija, para no saltarse sus límites.
-                string? aviso = null;
-                PermisoParametros parametros;
-                try
+        // Una sola conexión para las cuatro consultas (ReadList no la cierra si ya estaba abierta).
+        await DbContext.Database.OpenConnectionAsync(cancellationToken);
+        try
+        {
+            var filas = await ReadList(PermisoParametros.Sql, PermisoParametros.Leer, cancellationToken);
+            var anio = DateTime.Today.Year;
+            var feriados = await ReadList("""
+                SELECT DEPARTAMENTO_IHSS_ID, FECHA FROM PERMISO_FERIADO
+                WHERE FECHA >= :desde AND FECHA < :hasta
+                ORDER BY FECHA
+                """, reader => (
+                    IdDepartamento: ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
+                    Fecha: ReadDate(reader, "FECHA").ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)),
+                cancellationToken, ("desde", new DateTime(anio - 1, 1, 1)), ("hasta", new DateTime(anio + 2, 1, 1)));
+            // Los generales (sin departamento) van en todos; los propios, solo en su departamento.
+            var generales = feriados.Where(feriado => feriado.IdDepartamento is null).Select(feriado => feriado.Fecha).ToList();
+            var propios = feriados.Where(feriado => feriado.IdDepartamento is not null)
+                .ToLookup(feriado => feriado.IdDepartamento!.Value, feriado => feriado.Fecha);
+            var departamentos = await ReadList($"""
+                SELECT pd.DEPARTAMENTO_IHSS_ID, d.DEPARTAMENTO_IHSS_DESC AS NOMBRE, pd.ESTADO,
+                       (SELECT COUNT(*) FROM PERMISO_AREA a
+                        WHERE a.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID AND a.ESTADO = 'ACTIVO') AS AREAS,
+                       (SELECT COUNT(*) FROM EMPLEADOS_IHSS e
+                        WHERE e.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID AND e.ESTADO = 1) AS EMPLEADOS
+                FROM PERMISO_DEPARTAMENTO pd
+                JOIN DEPARTAMENTO_IHSS d ON d.DEPARTAMENTO_IHSS_ID = pd.DEPARTAMENTO_IHSS_ID
+                {filtroDepto}
+                ORDER BY UPPER(d.DEPARTAMENTO_IHSS_DESC)
+                """, reader =>
                 {
-                    parametros = PermisoParametros.Para(idDepartamento, filas);
-                }
-                catch (ArgumentException exception)
-                {
-                    parametros = PermisoParametros.PorDefecto;
-                    aviso = exception.Message;
-                }
-                return new PermisoDepartamentoDto(
-                    idDepartamento,
-                    ReadString(reader, "NOMBRE").Trim(),
+                    var idDepartamento = ReadInt(reader, "DEPARTAMENTO_IHSS_ID");
+                    // Un parámetro mal escrito no debe dejar sin pantalla a todos: se muestra la jornada
+                    // por defecto con un aviso. Registrar en ese departamento sigue fallando con el
+                    // mismo mensaje hasta que se corrija, para no saltarse sus límites.
+                    string? aviso = null;
+                    PermisoParametros parametros;
+                    try
+                    {
+                        parametros = PermisoParametros.Para(idDepartamento, filas);
+                    }
+                    catch (ArgumentException exception)
+                    {
+                        parametros = PermisoParametros.PorDefecto;
+                        aviso = exception.Message;
+                    }
+                    return new PermisoDepartamentoDto(
+                        idDepartamento,
+                        ReadString(reader, "NOMBRE").Trim(),
+                        ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
+                        parametros.InicioJornada.ToString("HH:mm", CultureInfo.InvariantCulture),
+                        parametros.FinJornada.ToString("HH:mm", CultureInfo.InvariantCulture),
+                        parametros.MinutosJornada,
+                        ReadInt(reader, "AREAS"),
+                        ReadInt(reader, "EMPLEADOS"),
+                        generales.Concat(propios[idDepartamento]).Order(StringComparer.Ordinal).ToList(),
+                        aviso);
+                },
+                cancellationToken, parametrosDepto);
+
+            var areas = await ReadList($"""
+                SELECT a.ID_AREA, a.DEPARTAMENTO_IHSS_ID, a.NOMBRE, a.ESTADO,
+                       (SELECT COUNT(*) FROM PERMISO_AREA_EMPLEADO ae
+                        JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = ae.ID_EMPLEADO
+                        WHERE ae.ID_AREA = a.ID_AREA AND e.ESTADO = 1
+                          AND e.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID) AS EMPLEADOS,
+                       (SELECT COUNT(*) FROM USUARIOS u
+                        WHERE u.ID_AREA_PERMISO = a.ID_AREA AND {VigenteSql}) AS JEFES
+                FROM PERMISO_AREA a
+                {(alcance.FiltroArea("a.") is { } filtro ? $"WHERE {filtro}" : string.Empty)}
+                ORDER BY UPPER(a.NOMBRE)
+                """, reader => new PermisoAreaDto(
+                    ReadInt(reader, "ID_AREA"),
+                    ReadInt(reader, "DEPARTAMENTO_IHSS_ID"),
+                    ReadString(reader, "NOMBRE"),
                     ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
-                    parametros.InicioJornada.ToString("HH:mm", CultureInfo.InvariantCulture),
-                    parametros.FinJornada.ToString("HH:mm", CultureInfo.InvariantCulture),
-                    parametros.MinutosJornada,
-                    ReadInt(reader, "AREAS"),
                     ReadInt(reader, "EMPLEADOS"),
-                    feriados.Where(feriado => feriado.IdDepartamento is null || feriado.IdDepartamento == idDepartamento)
-                        .Select(feriado => feriado.Fecha).ToList(),
-                    aviso);
-            },
-            cancellationToken, parametrosDepto);
+                    ReadInt(reader, "JEFES")),
+                cancellationToken, alcance.ParametrosArea());
 
-        var areas = await ReadList($"""
-            SELECT a.ID_AREA, a.DEPARTAMENTO_IHSS_ID, a.NOMBRE, a.ESTADO,
-                   (SELECT COUNT(*) FROM PERMISO_AREA_EMPLEADO ae
-                    JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = ae.ID_EMPLEADO
-                    WHERE ae.ID_AREA = a.ID_AREA AND e.ESTADO = 1
-                      AND e.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID) AS EMPLEADOS,
-                   (SELECT COUNT(*) FROM USUARIOS u
-                    WHERE u.ID_AREA_PERMISO = a.ID_AREA AND UPPER(u.ESTADO) = 'ACTIVO') AS JEFES
-            FROM PERMISO_AREA a
-            {(alcance.FiltroArea("a.") is { } filtro ? $"WHERE {filtro}" : string.Empty)}
-            ORDER BY UPPER(a.NOMBRE)
-            """, reader => new PermisoAreaDto(
-                ReadInt(reader, "ID_AREA"),
-                ReadInt(reader, "DEPARTAMENTO_IHSS_ID"),
-                ReadString(reader, "NOMBRE"),
-                ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
-                ReadInt(reader, "EMPLEADOS"),
-                ReadInt(reader, "JEFES")),
-            cancellationToken, alcance.ParametrosArea());
-
-        return new PermisoSesionDto(
-            alcance.Nivel,
-            alcance.IdDepartamento,
-            departamentos.FirstOrDefault(departamento => departamento.IdDepartamento == alcance.IdDepartamento)?.Nombre,
-            alcance.IdArea,
-            areas.FirstOrDefault(area => area.IdArea == alcance.IdArea)?.Nombre,
-            departamentos,
-            areas);
+            return new PermisoSesionDto(
+                alcance.Nivel,
+                alcance.IdDepartamento,
+                departamentos.FirstOrDefault(departamento => departamento.IdDepartamento == alcance.IdDepartamento)?.Nombre,
+                alcance.IdArea,
+                areas.FirstOrDefault(area => area.IdArea == alcance.IdArea)?.Nombre,
+                departamentos,
+                areas);
+        }
+        finally
+        {
+            await DbContext.Database.CloseConnectionAsync();
+        }
     }
 
     // ---- Departamentos (administrador general) -------------------------------------------
@@ -219,8 +236,8 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                 var areas = await GetScalar<int>(connection, transaction, """
                     SELECT COUNT(*) FROM PERMISO_AREA WHERE DEPARTAMENTO_IHSS_ID = :idDepartamento AND ESTADO = 'ACTIVO'
                     """, cancellationToken, ("idDepartamento", idDepartamento));
-                var administradores = await GetScalar<int>(connection, transaction, """
-                    SELECT COUNT(*) FROM USUARIOS WHERE ID_DEPTO_PERMISO = :idDepartamento AND UPPER(ESTADO) = 'ACTIVO'
+                var administradores = await GetScalar<int>(connection, transaction, $"""
+                    SELECT COUNT(*) FROM USUARIOS u WHERE u.ID_DEPTO_PERMISO = :idDepartamento AND {VigenteSql}
                     """, cancellationToken, ("idDepartamento", idDepartamento));
                 if (areas > 0 || administradores > 0)
                 {
@@ -285,8 +302,8 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                     JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = ae.ID_EMPLEADO
                     WHERE ae.ID_AREA = :idArea AND e.ESTADO = 1 AND e.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID
                     """, cancellationToken, ("idArea", idArea));
-                var jefes = await GetScalar<int>(connection, transaction, """
-                    SELECT COUNT(*) FROM USUARIOS WHERE ID_AREA_PERMISO = :idArea AND UPPER(ESTADO) = 'ACTIVO'
+                var jefes = await GetScalar<int>(connection, transaction, $"""
+                    SELECT COUNT(*) FROM USUARIOS u WHERE u.ID_AREA_PERMISO = :idArea AND {VigenteSql}
                     """, cancellationToken, ("idArea", idArea));
                 if (empleados > 0 || jefes > 0)
                 {
@@ -441,13 +458,13 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
         CancellationToken cancellationToken) =>
         ReadList($"""
             SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA
-            FROM USUARIOS
+            FROM USUARIOS u
             WHERE NVL(ROL, '-') <> 'Permisos'
               AND NVL(PERMISO_ADMIN, 0) = 0
               AND NVL(PERMISO_CONSULTA, 0) = 0
               AND ID_DEPTO_PERMISO IS NULL
               AND ID_AREA_PERMISO IS NULL
-              AND UPPER(ESTADO) = 'ACTIVO'
+              AND {VigenteSql}
               {(alcance.EsAdmin ? string.Empty : "AND LOWER(TRIM(USUARIO)) = LOWER(TRIM(:usuario))")}
             ORDER BY UPPER(NOMBRE_PERSONA), USUARIO
             """, reader => new PermisoUsuarioInventarioDto(
