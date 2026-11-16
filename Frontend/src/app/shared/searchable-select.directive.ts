@@ -1,7 +1,10 @@
 import { Directive, DoCheck, ElementRef, NgZone, OnDestroy, OnInit, Renderer2, inject } from '@angular/core';
 
+// Todas las listas desplegables usan el mismo menú (el del navegador no se puede estilizar). Con
+// el atributo sinBusqueda, para listas cortas, el campo es de solo lectura: se abre y se elige,
+// sin escribir para buscar.
 @Directive({
-  selector: 'select:not([nativeSelect])',
+  selector: 'select',
   standalone: true,
 })
 export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
@@ -24,12 +27,14 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
   private associatedLabel?: HTMLLabelElement;
   private originalLabelFor: string | null = null;
   private readonly zone = inject(NgZone);
+  private readonly conBusqueda: boolean;
 
   constructor(
     element: ElementRef<HTMLSelectElement>,
     private readonly renderer: Renderer2,
   ) {
     this.select = element.nativeElement;
+    this.conBusqueda = !this.select.hasAttribute('sinBusqueda');
   }
 
   ngOnInit(): void {
@@ -52,7 +57,11 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
     this.renderer.setAttribute(this.input, 'type', 'text');
     this.renderer.setAttribute(this.input, 'autocomplete', 'off');
     this.renderer.setAttribute(this.input, 'role', 'combobox');
-    this.renderer.setAttribute(this.input, 'aria-autocomplete', 'list');
+    this.renderer.setAttribute(this.input, 'aria-autocomplete', this.conBusqueda ? 'list' : 'none');
+    // Sin ancho propio: el <select> oculto, en la misma celda, da el ancho (y las reglas CSS que
+    // le ponen ancho a los select siguen sirviendo).
+    this.renderer.setAttribute(this.input, 'size', '1');
+    if (!this.conBusqueda) this.renderer.setAttribute(this.input, 'readonly', '');
     this.renderer.setAttribute(this.input, 'aria-expanded', 'false');
     this.renderer.setAttribute(this.input, 'aria-controls', listId);
     this.renderer.setAttribute(this.toggleButton, 'type', 'button');
@@ -68,7 +77,7 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
       ?? this.select.labels?.[0]?.textContent?.trim()
       ?? 'Buscar opción';
     this.renderer.setAttribute(this.input, 'aria-label', accessibleLabel);
-    this.renderer.setAttribute(this.input, 'placeholder', 'Buscar o seleccionar...');
+    if (this.conBusqueda) this.renderer.setAttribute(this.input, 'placeholder', 'Buscar o seleccionar...');
     this.associatedLabel = this.select.labels?.[0] as HTMLLabelElement | undefined;
     if (this.associatedLabel?.htmlFor === this.select.id) {
       this.originalLabelFor = this.associatedLabel.htmlFor;
@@ -99,6 +108,16 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
   private attachListeners(): void {
     if (!this.input || !this.toggleButton || !this.listbox) return;
     this.listeners.push(this.renderer.listen(this.input, 'focus', () => this.openList()));
+    // Un clic en el campo que ya tiene el foco (por ejemplo, después de elegir) vuelve a abrir la
+    // lista; sin búsqueda, un clic con la lista abierta la cierra, como un select.
+    this.listeners.push(this.renderer.listen(this.input, 'mousedown', (event: MouseEvent) => {
+      if (!this.open) {
+        if (this.input?.ownerDocument.activeElement === this.input) this.openList();
+      } else if (!this.conBusqueda) {
+        event.preventDefault();
+        this.closeList();
+      }
+    }));
     this.listeners.push(this.renderer.listen(this.toggleButton, 'mousedown', (event: MouseEvent) => event.preventDefault()));
     this.listeners.push(this.renderer.listen(this.toggleButton, 'click', () => {
       if (this.open) {
@@ -121,9 +140,17 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
     this.listeners.push(this.renderer.listen(this.select, 'focus', () => this.input?.focus()));
     this.listeners.push(this.renderer.listen(this.listbox, 'mousedown', (event: MouseEvent) => event.preventDefault()));
     this.listeners.push(this.renderer.listen(this.listbox, 'click', (event: MouseEvent) => this.handleOptionClick(event)));
-    this.listeners.push(this.renderer.listen('document', 'click', (event: MouseEvent) => {
-      if (!this.wrapper?.contains(event.target as Node) && !this.listbox?.contains(event.target as Node)) this.closeList();
-    }));
+    // Un clic fuera de la lista la cierra. Se escucha en captura: las ventanas modales detienen la
+    // propagación del clic (para no cerrarse) y en burbuja la lista nunca se enteraría.
+    const clicFuera = (event: MouseEvent): void => {
+      if (this.open && !this.wrapper?.contains(event.target as Node) && !this.listbox?.contains(event.target as Node)) {
+        this.closeList();
+      }
+    };
+    document.addEventListener('mousedown', clicFuera, true);
+    this.listeners.push(() => document.removeEventListener('mousedown', clicFuera, true));
+    // Salir del campo (Tab) también la cierra. Los clics en la lista y en la flecha no le quitan el foco.
+    this.listeners.push(this.renderer.listen(this.input, 'blur', () => this.closeList()));
     this.listeners.push(this.renderer.listen('window', 'scroll', () => { if (this.open) this.positionListbox(); }));
     this.listeners.push(this.renderer.listen('window', 'resize', () => { if (this.open) this.positionListbox(); }));
 
@@ -207,7 +234,8 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
     this.query = '';
     this.activeIndex = this.select.selectedIndex >= 0 ? this.select.selectedIndex : 0;
     this.renderer.setProperty(this.input, 'value', this.select.selectedOptions[0]?.textContent?.trim() ?? '');
-    this.input.select();
+    // Con búsqueda se selecciona el texto para escribir encima; sin búsqueda no hay nada que escribir.
+    if (this.conBusqueda) this.input.select();
     this.positionListbox();
     this.renderOptions();
     this.updateExpandedState();
@@ -266,6 +294,12 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
   }
 
   private handleKeydown(event: KeyboardEvent): void {
+    // Sin búsqueda, la barra espaciadora abre la lista como en un select.
+    if (event.key === ' ' && !this.conBusqueda && !this.open) {
+      event.preventDefault();
+      this.openList();
+      return;
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       if (!this.open) this.openList();
@@ -293,7 +327,7 @@ export class SearchableSelectDirective implements OnInit, DoCheck, OnDestroy {
     if (this.filteredOptions.length === 0) return;
     this.activeIndex = Math.min(Math.max(this.activeIndex + offset, 0), this.filteredOptions.length - 1);
     this.renderOptions();
-    this.listbox?.querySelector(`#${this.listbox.id}-option-${this.activeIndex}`)?.scrollIntoView({ block: 'nearest' });
+    this.listbox?.querySelector(`#${this.listbox.id}-option-${this.activeIndex}`)?.scrollIntoView?.({ block: 'nearest' });
   }
 
   private handleOptionClick(event: MouseEvent): void {

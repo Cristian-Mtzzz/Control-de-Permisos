@@ -1,5 +1,5 @@
 import { ReportColumn, addReportSheet, cellText, createReportWorkbook, downloadReportWorkbook, excelDate, generatedAt, reportFileName } from '../shared/excel-report';
-import { PERMISO_TIPOS, Permiso, PermisoTipo } from './permisos.models';
+import { PERMISO_TIPOS, Permiso, PermisoTipo, TIPO_VACACIONES } from './permisos.models';
 import {
   MinutosJornada, PERMISO_ESTADOS, PermisoEstadoVista, ResumenEmpleado, apiDay, formatDay, isActive, resumenPorEmpleado,
 } from './permisos-resumen';
@@ -23,7 +23,7 @@ const estadoLabel = (estado: PermisoEstadoVista): string =>
   PERMISO_ESTADOS.find((item) => item.value === estado)?.label ?? estado;
 
 export const tipoLabel = (tipo: string): string =>
-  PERMISO_TIPOS.find((item) => item.value === tipo)?.label ?? tipo;
+  tipo === TIPO_VACACIONES.value ? TIPO_VACACIONES.label : PERMISO_TIPOS.find((item) => item.value === tipo)?.label ?? tipo;
 
 // estadoDe da el estado que se ve en pantalla (activo, finalizado o anulado).
 export function filterPermisosForReport(
@@ -100,7 +100,7 @@ export async function exportPermisosReport(
     { header: 'Salida', width: 9, value: (p) => cellText(p.HoraSalida) },
     { header: 'Entrada', width: 9, value: (p) => cellText(p.HoraEntrada) },
     { header: 'Horas', width: 9, value: (p) => p.Tipo === 'HORA' ? hours(p.Minutos) : '-' },
-    { header: 'Días hábiles', width: 12, value: (p) => p.Tipo === 'DIA' ? p.DiasHabiles : '-' },
+    { header: 'Días hábiles', width: 12, value: (p) => p.Tipo !== 'HORA' ? p.DiasHabiles : '-' },
     { header: 'Estado', width: 12, value: (p) => estadoDe(p) },
   ];
   addReportSheet(workbook, {
@@ -119,11 +119,12 @@ export async function exportPermisosReport(
     { header: 'Permisos por hora', width: 17, value: (r) => r.PermisosHora },
     { header: 'Horas', width: 9, value: (r) => hours(r.Minutos) },
     { header: 'Total en días', width: 14, value: (r) => Math.round(r.TotalDias * 100) / 100 },
+    { header: 'Días de vacaciones', width: 18, value: (r) => r.DiasVacaciones },
   ];
   addReportSheet(workbook, {
     sheetName: 'Por empleado',
     title: 'PERMISOS POR EMPLEADO',
-    subtitle: `Sin los permisos anulados · total en días = días hábiles + horas ÷ jornada del departamento · ${filterText} · ${generatedAt()}`,
+    subtitle: `Sin los anulados · total en días = días hábiles + horas ÷ jornada del departamento (sin vacaciones) · ${filterText} · ${generatedAt()}`,
     tableName: 'ResumenPorEmpleado',
     columns: summaryColumns,
     rows: resumenPorEmpleado(activos, minutosJornada),

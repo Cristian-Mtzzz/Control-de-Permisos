@@ -8,9 +8,8 @@ namespace ControlPermisos.Api.Controllers;
 
 [ApiController]
 // [Authorize] aplica la política por defecto (contraseña inicial ya cambiada). El acceso no se
-// decide por rol ni por módulos sino por el perfil en la base (nivel, departamento o área), que
-// se lee en cada solicitud: así una cuenta de inventario puede ser jefe de un área, y ni el Admin
-// general ni el acceso total (ADMIN_TOTAL) entran por serlo.
+// decide por rol ni por módulos sino por el perfil del usuario en USUARIOS_PERMISOS (nivel,
+// departamento o área), que se lee en cada solicitud.
 [Authorize]
 [Route("api/permisos")]
 // Control de permisos por departamento y área (jefatura). El jefe ve y registra lo de su área; el
@@ -60,7 +59,7 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     {
         if (idPermiso <= 0) return BadRequest(new { Message = "El permiso no es válido." });
         if (ValidateDia(permiso) is { } message) return BadRequest(new { Message = message });
-        return await permisoService.UpdatePermisoDia(await EscrituraAlcance(cancellationToken), idPermiso, permiso, cancellationToken)
+        return await permisoService.UpdatePermisoDia(await ModificarAlcance(cancellationToken), idPermiso, permiso, cancellationToken)
             ? NoContent()
             : NotFound(new { Message = PermisoNotFound });
     }
@@ -78,16 +77,36 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     {
         if (idPermiso <= 0) return BadRequest(new { Message = "El permiso no es válido." });
         if (ValidateHora(permiso) is { } message) return BadRequest(new { Message = message });
-        return await permisoService.UpdatePermisoHora(await EscrituraAlcance(cancellationToken), idPermiso, permiso, cancellationToken)
+        return await permisoService.UpdatePermisoHora(await ModificarAlcance(cancellationToken), idPermiso, permiso, cancellationToken)
             ? NoContent()
             : NotFound(new { Message = PermisoNotFound });
+    }
+
+    // Las vacaciones se listan con los permisos (GET /permisos, tipo VAC) y se anulan igual que ellos.
+    // Una solicitud puede traer varios períodos: se registran todos o ninguno.
+    [HttpPost("vacaciones")]
+    public async Task<IActionResult> CreateVacaciones(SaveVacacionesDto vacaciones, CancellationToken cancellationToken)
+    {
+        if (ValidateVacaciones(vacaciones) is { } message) return BadRequest(new { Message = message });
+        await permisoService.CreateVacaciones(await EscrituraAlcance(cancellationToken), vacaciones, cancellationToken);
+        return NoContent();
+    }
+
+    [HttpPut("vacaciones/{idPermiso:int}")]
+    public async Task<IActionResult> UpdateVacacion(int idPermiso, SaveVacacionDto vacacion, CancellationToken cancellationToken)
+    {
+        if (idPermiso <= 0) return BadRequest(new { Message = "Las vacaciones no son válidas." });
+        if (ValidateVacacion(vacacion) is { } message) return BadRequest(new { Message = message });
+        return await permisoService.UpdateVacacion(await ModificarAlcance(cancellationToken), idPermiso, vacacion, cancellationToken)
+            ? NoContent()
+            : NotFound(new { Message = "No se encontraron las vacaciones indicadas." });
     }
 
     [HttpPut("{idPermiso:int}/anular")]
     public async Task<IActionResult> AnularPermiso(int idPermiso, CancellationToken cancellationToken)
     {
         if (idPermiso <= 0) return BadRequest(new { Message = "El permiso no es válido." });
-        return await permisoService.AnularPermiso(await EscrituraAlcance(cancellationToken), idPermiso, cancellationToken)
+        return await permisoService.AnularPermiso(await ModificarAlcance(cancellationToken), idPermiso, cancellationToken)
             ? NoContent()
             : NotFound(new { Message = "No se encontró un permiso activo con ese número." });
     }
@@ -98,7 +117,7 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     public async Task<IActionResult> AsignarArea(int idEmpleado, AsignarAreaDto asignacion, CancellationToken cancellationToken)
     {
         if (idEmpleado <= 0 || asignacion.IdArea <= 0) return BadRequest(new { Message = "Selecciona el empleado y el área." });
-        await permisoService.AsignarArea(await EscrituraAlcance(cancellationToken), idEmpleado, asignacion.IdArea, cancellationToken);
+        await permisoService.AsignarArea(await ModificarAlcance(cancellationToken), idEmpleado, asignacion.IdArea, cancellationToken);
         return NoContent();
     }
 
@@ -106,9 +125,23 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     public async Task<IActionResult> QuitarArea(int idEmpleado, CancellationToken cancellationToken)
     {
         if (idEmpleado <= 0) return BadRequest(new { Message = "El empleado no es válido." });
-        return await permisoService.QuitarArea(await EscrituraAlcance(cancellationToken), idEmpleado, cancellationToken)
+        return await permisoService.QuitarArea(await ModificarAlcance(cancellationToken), idEmpleado, cancellationToken)
             ? NoContent()
             : NotFound(new { Message = "El empleado no pertenece a un área que administres." });
+    }
+
+    // No. de pago del empleado, editable en Personal (el formulario del permiso lo carga de ahí).
+    [HttpPut("personal/{idEmpleado:int}/no-pago")]
+    public async Task<IActionResult> GuardarNoPagoEmpleado(int idEmpleado, NoPagoEmpleadoDto dato, CancellationToken cancellationToken)
+    {
+        if (idEmpleado <= 0) return BadRequest(new { Message = "El empleado no es válido." });
+        if ((dato.NoPago?.Trim().Length ?? 0) > MaxNoPagoEmpleado)
+        {
+            return BadRequest(new { Message = $"El No. de pago no puede superar {MaxNoPagoEmpleado} caracteres." });
+        }
+        return await permisoService.GuardarNoPagoEmpleado(await ModificarAlcance(cancellationToken), idEmpleado, dato.NoPago, cancellationToken)
+            ? NoContent()
+            : NotFound(new { Message = "El empleado no existe, está inactivo o no está en tu alcance." });
     }
 
     // ---- Departamentos (solo administrador general) --------------------------------------
@@ -165,6 +198,17 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
             : NotFound(new { Message = "No se encontró el área indicada." });
     }
 
+    // ---- Logos de los formatos de impresión ----------------------------------------------
+
+    // Los carga el administrador de la base en PERMISO_LOGO; aquí solo se leen, y los lee
+    // cualquiera que entre porque el formato de impresión los necesita.
+    [HttpGet("logos")]
+    public async Task<ActionResult<IReadOnlyList<PermisoLogoDto>>> GetLogos(CancellationToken cancellationToken)
+    {
+        await Alcance(cancellationToken);
+        return Ok(await areaService.GetLogos(cancellationToken));
+    }
+
     [HttpGet("jefes")]
     public async Task<ActionResult<IReadOnlyList<PermisoJefeDto>>> GetJefes(CancellationToken cancellationToken) =>
         Ok(await areaService.GetJefes(await AdminAlcance(cancellationToken), cancellationToken));
@@ -193,30 +237,16 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
         if (idUsuario <= 0) return BadRequest(new { Message = "El usuario no es válido." });
         return await areaService.ResetJefePassword(await AdminAlcance(cancellationToken), idUsuario, cancellationToken)
             ? NoContent()
-            : NotFound(new { Message = "Solo se restablece la contraseña de cuentas locales propias del control de permisos que administras." });
+            : NotFound(new { Message = "Solo se restablece la contraseña de usuarios locales que administras." });
     }
 
-    // Cuentas de inventario a las que se les puede dar acceso con la misma cuenta. El administrador
-    // de departamento debe indicar el usuario exacto (?usuario=...).
-    [HttpGet("usuarios-inventario")]
-    public async Task<ActionResult<IReadOnlyList<PermisoUsuarioInventarioDto>>> GetUsuariosInventario(
-        [FromQuery] string? usuario, CancellationToken cancellationToken)
-    {
-        var alcance = await AdminAlcance(cancellationToken);
-        if (!alcance.EsAdmin && string.IsNullOrWhiteSpace(usuario))
-        {
-            return BadRequest(new { Message = "Escribe el usuario de la cuenta de inventario." });
-        }
-        return Ok(await areaService.GetUsuariosInventario(alcance, usuario, cancellationToken));
-    }
-
-    [HttpDelete("jefes/{idUsuario:int}/acceso")]
-    public async Task<IActionResult> QuitarAcceso(int idUsuario, CancellationToken cancellationToken)
+    [HttpDelete("jefes/{idUsuario:int}")]
+    public async Task<IActionResult> DeleteJefe(int idUsuario, CancellationToken cancellationToken)
     {
         if (idUsuario <= 0) return BadRequest(new { Message = "El usuario no es válido." });
-        return await areaService.QuitarAcceso(await AdminAlcance(cancellationToken), idUsuario, cancellationToken)
+        return await areaService.DeleteJefe(await AdminAlcance(cancellationToken), idUsuario, cancellationToken)
             ? NoContent()
-            : NotFound(new { Message = "Solo se quita el acceso a cuentas de inventario que administras; las propias de permisos se desactivan." });
+            : NotFound(new { Message = "No se encontró el usuario indicado o no lo administras." });
     }
 
     // Nivel, departamento y área se leen de la base en cada solicitud (no del token), así un cambio aplica de inmediato.
@@ -229,13 +259,25 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
         return await areaService.GetAlcance(userId, cancellationToken);
     }
 
-    // Registrar, editar, anular y mover personal: todos menos la consulta.
+    // Registrar permisos y vacaciones: todos menos la consulta y la secretaría. El empleado
+    // registra los suyos (el servicio valida que sean de él).
     private async Task<PermisoAlcance> EscrituraAlcance(CancellationToken cancellationToken)
     {
         var alcance = await Alcance(cancellationToken);
-        return alcance.SoloLectura
-            ? throw new UnauthorizedAccessException("Tu usuario es de consulta: puede ver y exportar, pero no modificar.")
-            : alcance;
+        if (!alcance.SoloLectura) return alcance;
+        throw new UnauthorizedAccessException(alcance.Nivel == PermisoValores.NivelSecretaria
+            ? "Tu usuario es de secretaría: puede ver y exportar los permisos del departamento, pero no registrarlos."
+            : "Tu usuario es de consulta: puede ver y exportar, pero no modificar.");
+    }
+
+    // Editar, anular y mover personal: lo que el empleado tampoco hace con lo que ya registró.
+    private async Task<PermisoAlcance> ModificarAlcance(CancellationToken cancellationToken)
+    {
+        var alcance = await EscrituraAlcance(cancellationToken);
+        return alcance.ModificaRegistros
+            ? alcance
+            : throw new UnauthorizedAccessException(
+                "Tu usuario registra sus permisos y vacaciones, pero no los modifica: pídele el cambio a tu jefe.");
     }
 
     private async Task<PermisoAlcance> AdminAlcance(CancellationToken cancellationToken)
@@ -255,34 +297,95 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
     }
 
     // Reglas de forma; las de negocio (área, días hábiles, choques y límites) las aplica el servicio.
+    // Máximos de PERMISO_SOLICITUD.LUGAR_SOLICITUD y TELEFONO.
+    internal const int MaxLugar = 100;
+    internal const int MaxTelefono = 20;
+
     private static string? ValidateDia(SavePermisoDiaDto permiso)
     {
-        if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo) is { } message) return message;
+        if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo, permiso.NoPago) is { } message) return message;
         if (permiso.FechaInicio == default || permiso.FechaFin == default) return "Indica la fecha inicial y la fecha final.";
-        return ValidateFechaSolicitud(permiso.FechaSolicitud);
+        if (string.IsNullOrWhiteSpace(permiso.Telefono)) return "Escribe el número de teléfono donde localizar al empleado.";
+        var telefono = permiso.Telefono.Trim();
+        if (telefono.Length > MaxTelefono || !telefono.All(c => char.IsDigit(c) || c is ' ' or '-' or '+' or '(' or ')')
+            || telefono.Count(char.IsDigit) < 7)
+        {
+            return "El número de teléfono no es válido: usa solo números (al menos 7), espacios, guiones, paréntesis o +.";
+        }
+        if (string.IsNullOrWhiteSpace(permiso.Lugar)) return "Escribe el lugar.";
+        return permiso.Lugar.Trim().Length > MaxLugar ? $"El lugar no puede superar {MaxLugar} caracteres." : null;
     }
 
     private static string? ValidateHora(SavePermisoHoraDto permiso)
     {
-        if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo) is { } message) return message;
+        if (ValidateCommon(permiso.IdEmpleado, permiso.Motivo, permiso.NoPago) is { } message) return message;
         if (permiso.Fecha == default) return "Indica la fecha del permiso.";
         if (string.IsNullOrWhiteSpace(permiso.HoraSalida) || string.IsNullOrWhiteSpace(permiso.HoraEntrada))
         {
-            return "Indica la hora de salida y la hora de entrada.";
+            return "Indica la hora de salida y la hora de regreso.";
         }
-        return ValidateFechaSolicitud(permiso.FechaSolicitud);
+        return null;
     }
 
-    // Puede ser posterior al permiso (se pide después de faltar), pero no una fecha que todavía no llega.
+    // La fecha de solicitud es la del día en que el empleado las pidió: hoy o antes.
+    internal static string? ValidateVacacion(SaveVacacionDto vacacion)
+    {
+        if (vacacion.IdEmpleado <= 0) return "Selecciona el empleado.";
+        if (vacacion.FechaInicio == default || vacacion.FechaFin == default) return "Indica la fecha de inicio y la de finalización.";
+        return ValidateFechaSolicitud(vacacion.FechaSolicitud);
+    }
+
+    // Períodos que admite una solicitud de vacaciones.
+    internal const int MaxPeriodosVacaciones = 20;
+
+    // Cada período completo y en orden, y ninguno se cruza con otro de la misma solicitud (los
+    // choques con lo ya registrado los revisa el servicio).
+    internal static string? ValidateVacaciones(SaveVacacionesDto vacaciones)
+    {
+        if (vacaciones.IdEmpleado <= 0) return "Selecciona el empleado.";
+        if (vacaciones.Periodos is not { Count: > 0 } periodos) return "Indica al menos un período de vacaciones.";
+        if (periodos.Count > MaxPeriodosVacaciones)
+        {
+            return $"Una solicitud admite hasta {MaxPeriodosVacaciones} períodos de vacaciones.";
+        }
+        if (periodos.Any(periodo => periodo is null || periodo.FechaInicio == default || periodo.FechaFin == default))
+        {
+            return "Indica la fecha de inicio y la de finalización de cada período.";
+        }
+        if (periodos.FirstOrDefault(periodo => periodo.FechaFin.Date < periodo.FechaInicio.Date) is { } alReves)
+        {
+            return $"En el período del {alReves.FechaInicio:dd/MM/yyyy} al {alReves.FechaFin:dd/MM/yyyy} la finalización es anterior al inicio.";
+        }
+        var ordenados = periodos.OrderBy(periodo => periodo.FechaInicio.Date).ToList();
+        for (var i = 1; i < ordenados.Count; i++)
+        {
+            var (anterior, actual) = (ordenados[i - 1], ordenados[i]);
+            if (actual.FechaInicio.Date <= anterior.FechaFin.Date)
+            {
+                return $"Los períodos del {anterior.FechaInicio:dd/MM/yyyy} al {anterior.FechaFin:dd/MM/yyyy} "
+                    + $"y del {actual.FechaInicio:dd/MM/yyyy} al {actual.FechaFin:dd/MM/yyyy} se cruzan.";
+            }
+        }
+        return ValidateFechaSolicitud(vacaciones.FechaSolicitud);
+    }
+
     private static string? ValidateFechaSolicitud(DateTime fechaSolicitud)
     {
-        if (fechaSolicitud == default) return "Indica la fecha en que se hizo la solicitud.";
-        return fechaSolicitud.Date > DateTime.Today ? "La fecha de solicitud no puede ser posterior a hoy." : null;
+        if (fechaSolicitud == default) return "Indica la fecha de solicitud.";
+        return fechaSolicitud.Date > DateTime.Today ? "La fecha de solicitud no puede ser futura." : null;
     }
 
-    private static string? ValidateCommon(int idEmpleado, string? motivo)
+    // Máximo de PERMISO_SOLICITUD.NO_PAGO.
+    internal const int MaxNoPago = 20;
+    // Tamaño de EMPLEADOS_IHSS.NPAGO (VARCHAR2(15)).
+    internal const int MaxNoPagoEmpleado = 15;
+
+    // El No. de pago se escribe en cada permiso (no sale del empleado) y es obligatorio.
+    private static string? ValidateCommon(int idEmpleado, string? motivo, string? noPago)
     {
         if (idEmpleado <= 0) return "Selecciona el empleado.";
+        if (string.IsNullOrWhiteSpace(noPago)) return "Escribe el No. de pago.";
+        if (noPago.Trim().Length > MaxNoPago) return $"El No. de pago no puede superar {MaxNoPago} caracteres.";
         if (string.IsNullOrWhiteSpace(motivo)) return "Escribe el motivo del permiso.";
         return motivo.Length > 1000 ? "El motivo no puede superar 1000 caracteres." : null;
     }
@@ -307,6 +410,14 @@ public sealed class PermisosController(IPermisoService permisoService, IPermisoA
         if (jefe.Nivel == PermisoValores.NivelAdminDepartamento && jefe.IdDepartamento is null or <= 0)
         {
             return "Selecciona el departamento que administra.";
+        }
+        if (jefe.Nivel == PermisoValores.NivelSecretaria && jefe.IdDepartamento is null or <= 0)
+        {
+            return "Selecciona el departamento de la secretaría.";
+        }
+        if (jefe.Nivel == PermisoValores.NivelUsuario && jefe.IdEmpleado is null or <= 0)
+        {
+            return "Selecciona al empleado de la cuenta.";
         }
         if (jefe.Dominio is not 0 and not 1) return "El tipo de autenticación debe ser de dominio o local.";
         if (!PermisoValores.Dominios.Contains(jefe.DominioP?.Trim().ToUpperInvariant())) return "El dominio debe ser BA, HE, HRN o IVM.";

@@ -1,157 +1,874 @@
-/* Solo lo propio del Control de permisos: el resto del aspecto (shell, tabla, modales y
-   botones) viene de taller.component.css y de las reglas globales de styles.css. */
+/* Distribución de la pantalla de permisos y su resumen. Botones, campos, tablas, etiquetas y
+   ventanas vienen de styles.css. */
 
-/* ---- Pestañas y filtro de área ----------------------------------------------------- */
-.permisos-tabs {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .25rem;
-    margin-top: 1.5rem;
-    border-bottom: 1px solid #d8e4e0;
+:host {
+    display: block;
 }
 
-.permisos-tabs button {
-    margin-bottom: -1px;
-    padding: .7rem 1.1rem;
-    border: 0;
-    border-bottom: 3px solid transparent;
-    color: #617573;
-    background: transparent;
-    cursor: pointer;
-    font: inherit;
-    font-size: .88rem;
-    font-weight: 700;
-}
-
-.permisos-tabs button:hover {
-    color: #18383b;
-}
-
-.permisos-tabs button.active {
-    border-bottom-color: #276968;
-    color: #276968;
-}
-
-.area-filter-bar {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: flex-end;
-    gap: .75rem 1.5rem;
-    margin-top: 1.25rem;
-}
-
-/* ---- Indicadores ------------------------------------------------------------------- */
-.permisos-kpis {
+.app-frame {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 1rem;
-    margin-top: 1.75rem;
+    grid-template-columns: 252px minmax(0, 1fr);
+    min-height: 100dvh;
 }
 
-.kpi-card {
-    display: grid;
-    gap: .2rem;
-    padding: 1.1rem 1.25rem;
-    border: 1px solid #d8e4e0;
-    border-radius: 10px;
-    background: #fff;
+.workspace {
+    min-width: 0;
+    padding: 1.6rem clamp(1rem, 2.5vw, 2.25rem) 3rem;
 }
 
-.kpi-label {
-    color: #397b78;
-    font-size: .7rem;
-    font-weight: 700;
-    letter-spacing: .14em;
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+.capital::first-letter {
     text-transform: uppercase;
 }
 
-.kpi-value {
-    color: #18383b;
-    font-family: 'Space Grotesk', sans-serif;
+svg {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+/* ---- Secciones de la barra lateral (se proyectan en app-sidebar) -------------------- */
+.nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    width: 100%;
+    padding: .62rem .7rem;
+    border: 0;
+    border-radius: var(--radio);
+    color: #c9d3e1;
+    background: transparent;
+    cursor: pointer;
+    font-size: .9rem;
+    font-weight: 500;
+    line-height: 1.3;
+    text-align: left;
+}
+
+.nav-item:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, .06);
+}
+
+.nav-item:focus-visible {
+    outline-color: var(--oro);
+}
+
+/* La sección abierta: fondo un poco más claro y la marca dorada del escudo a la izquierda. */
+.nav-item.active {
+    color: #fff;
+    background: var(--anil-2);
+    font-weight: 600;
+}
+
+.nav-item.active::before {
+    position: absolute;
+    top: .5rem;
+    bottom: .5rem;
+    left: -.9rem;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: var(--oro);
+    content: '';
+}
+
+.nav-item.active svg {
+    color: var(--oro);
+}
+
+/* ---- Barra superior ---------------------------------------------------------------- */
+.topbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 1.5rem;
+    padding-bottom: 1.25rem;
+    border-bottom: 1px solid var(--linea);
+}
+
+.topbar-title h1 {
+    font-size: clamp(1.45rem, 2.4vw, 1.85rem);
+    font-weight: 700;
+    line-height: 1.15;
+}
+
+.topbar-tools {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .6rem;
+}
+
+.area-filter-bar,
+.topbar-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .5rem;
+}
+
+.area-filter-bar select {
+    min-width: 12rem;
+    max-width: 18rem;
+}
+
+/* ---- Resumen: pestañas con su total ------------------------------------------------ */
+.resumen {
+    margin-top: 1.5rem;
+}
+
+/* Filtro de tipo del resumen: permisos o vacaciones. */
+.resumen-tipo {
+    display: flex;
+    margin-bottom: 1rem;
+}
+
+.resumen-tipo .tipo-selector {
+    grid-template-columns: repeat(2, minmax(6.5rem, auto));
+    border: 1px solid var(--linea);
+    background: var(--blanco, #fff);
+}
+
+.vista-tabs {
+    display: flex;
+    gap: .25rem;
+}
+
+.vista-tab {
+    position: relative;
+    display: grid;
+    grid-template-columns: auto auto;
+    grid-template-areas:
+        'label label'
+        'valor caption';
+    align-items: baseline;
+    justify-content: start;
+    gap: .1rem .6rem;
+    min-width: 12.5rem;
+    padding: .85rem 1.25rem 1rem;
+    border: 1px solid transparent;
+    border-bottom: 0;
+    border-radius: var(--radio-grande) var(--radio-grande) 0 0;
+    color: var(--gris);
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+}
+
+.vista-tab:hover {
+    background: rgba(255, 255, 255, .6);
+}
+
+.vista-tab.active {
+    z-index: 1;
+    margin-bottom: -1px;
+    border-color: var(--linea);
+    color: var(--tinta);
+    background: var(--superficie);
+}
+
+/* El dorado marca la pestaña abierta, como la sección abierta de la barra lateral. */
+.vista-tab.active::before {
+    position: absolute;
+    top: -1px;
+    right: 1.25rem;
+    left: 1.25rem;
+    height: 3px;
+    border-radius: 0 0 3px 3px;
+    background: var(--oro);
+    content: '';
+}
+
+.vista-label {
+    grid-area: label;
+    font-size: .86rem;
+    font-weight: 600;
+}
+
+.vista-tab .kpi-value {
+    grid-area: valor;
     font-size: 2.1rem;
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+    letter-spacing: -.02em;
     line-height: 1.1;
 }
 
-.kpi-caption {
-    color: #718080;
-    font-size: .78rem;
+.vista-caption {
+    grid-area: caption;
+    color: var(--gris);
+    font-size: .8rem;
 }
 
-/* "Hoy" es el dato del día: se destaca con el color principal. */
-.kpi-primary {
-    border-color: #276968;
-    background: #276968;
+.vista-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 300px;
+    border: 1px solid var(--linea);
+    border-radius: 0 var(--radio-grande) var(--radio-grande) var(--radio-grande);
+    background: var(--superficie);
 }
 
-.kpi-primary .kpi-label,
-.kpi-primary .kpi-caption {
-    color: #d5ebe4;
+.vista-panel {
+    min-width: 0;
+    padding: 1.4rem 1.5rem 1.6rem;
 }
 
-.kpi-primary .kpi-value {
-    color: #fff;
-}
-
-/* ---- Con permiso hoy --------------------------------------------------------------- */
-.permisos-hoy {
-    margin-top: 1rem;
-    padding: 1rem 1.25rem;
-    border: 1px solid #d8e4e0;
-    border-radius: 10px;
-    background: #fff;
-}
-
-.permisos-hoy h2 {
-    margin-bottom: .6rem;
-    color: #18383b;
-    font-size: .95rem;
-}
-
-.permisos-hoy ul {
+.vista-head {
     display: flex;
     flex-wrap: wrap;
-    gap: .5rem;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: .5rem 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.vista-head h2 {
+    font-size: 1.15rem;
+    font-weight: 650;
+}
+
+.vista-head p {
+    margin: .15rem 0 0;
+    color: var(--gris);
+    font-size: .84rem;
+}
+
+.vista-empty {
+    display: grid;
+    justify-items: start;
+    gap: .75rem;
+    padding: 2rem 0 1rem;
+    color: var(--gris);
+}
+
+.vista-empty p {
+    margin: 0;
+}
+
+/* Nombre del empleado con su área y el detalle; abre su historial. */
+.empleado-link {
+    padding: 0;
+    border: 0;
+    color: var(--tinta);
+    background: transparent;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+}
+
+.empleado-link:hover {
+    color: var(--primario);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.fila-persona {
+    display: grid;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+.fila-persona strong,
+.fila-persona small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.fila-persona strong {
+    font-size: .86rem;
+    font-weight: 600;
+}
+
+.fila-persona small {
+    color: var(--gris);
+    font-size: .76rem;
+}
+
+.fila-persona:hover small {
+    text-decoration: none;
+}
+
+/* ---- Franja de hoy: la jornada como eje horizontal --------------------------------- */
+.timeline {
+    --persona: 15rem;
+    position: relative;
+    padding-bottom: 1.6rem;
+}
+
+.timeline-axis {
+    position: relative;
+    height: 1.4rem;
+    margin-left: var(--persona);
+    color: var(--gris-2);
+    font-size: .72rem;
+    font-variant-numeric: tabular-nums;
+}
+
+.timeline-axis span {
+    position: absolute;
+    top: 0;
+    transform: translateX(-50%);
+}
+
+.timeline-axis span:first-child {
+    transform: none;
+}
+
+.timeline-axis span:last-child {
+    transform: translateX(-100%);
+}
+
+.timeline-rows {
     margin: 0;
     padding: 0;
     list-style: none;
 }
 
-.permisos-hoy li {
-    display: inline-flex;
+.timeline-row {
+    display: grid;
+    grid-template-columns: var(--persona) minmax(0, 1fr);
     align-items: center;
+    min-height: 3.1rem;
+    border-top: 1px solid var(--linea);
+}
+
+.timeline-row:last-child {
+    border-bottom: 1px solid var(--linea);
+}
+
+.timeline-row .fila-persona {
+    padding-right: 1rem;
+}
+
+.timeline-track {
+    position: relative;
+    height: 100%;
+    min-height: 3.1rem;
+}
+
+/* Líneas de cada hora. */
+.timeline-track i {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: var(--linea);
+}
+
+.timeline-bar {
+    position: absolute;
+    top: .65rem;
+    bottom: .65rem;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    padding: 0 .6rem;
+    border-left: 3px solid var(--dia);
+    border-radius: 4px;
+    color: var(--dia);
+    background: var(--dia-suave);
+    font-size: .76rem;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.timeline-bar.hora {
+    border-left-color: var(--hora);
+    color: var(--hora);
+    background: var(--hora-suave);
+}
+
+.timeline-bar.vacaciones {
+    border-left-color: var(--vac);
+    color: var(--vac);
+    background: var(--vac-suave);
+}
+
+/* "Ahora": línea dorada sobre todas las filas. */
+.timeline-now-layer {
+    position: absolute;
+    top: 1.4rem;
+    right: 0;
+    bottom: 1.6rem;
+    left: var(--persona);
+    pointer-events: none;
+}
+
+.timeline-now {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    margin-left: -1px;
+    background: var(--oro);
+}
+
+.timeline-now b {
+    position: absolute;
+    bottom: -1.45rem;
+    left: 50%;
+    padding: .05rem .35rem;
+    border-radius: 4px;
+    color: #fff;
+    background: var(--oro);
+    font-size: .68rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    transform: translateX(-50%);
+}
+
+/* ---- Semana: lunes a domingo ------------------------------------------------------- */
+.semana {
+    --persona: 15rem;
+    overflow-x: auto;
+}
+
+.semana-row {
+    display: grid;
+    grid-template-columns: var(--persona) minmax(28rem, 1fr);
+    align-items: center;
+    min-height: 3rem;
+    border-top: 1px solid var(--linea);
+}
+
+.semana-row:last-child {
+    border-bottom: 1px solid var(--linea);
+}
+
+.semana-row .fila-persona {
+    padding-right: 1rem;
+}
+
+.semana-head {
+    min-height: 2rem;
+    border-top: 0;
+}
+
+.semana-track {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    align-items: center;
+    height: 100%;
+}
+
+.semana-track i {
+    grid-row: 1;
+    align-self: stretch;
+    min-height: 3rem;
+    border-left: 1px solid var(--linea);
+}
+
+.semana-track i:nth-of-type(1) { grid-column: 1; }
+.semana-track i:nth-of-type(2) { grid-column: 2; }
+.semana-track i:nth-of-type(3) { grid-column: 3; }
+.semana-track i:nth-of-type(4) { grid-column: 4; }
+.semana-track i:nth-of-type(5) { grid-column: 5; }
+.semana-track i:nth-of-type(6) { grid-column: 6; }
+.semana-track i:nth-of-type(7) { grid-column: 7; }
+
+.semana-track i.fin {
+    background: repeating-linear-gradient(135deg, transparent 0 6px, #f2f4f7 6px 12px);
+}
+
+.semana-track i.hoy {
+    background: #fbf7ec;
+}
+
+.semana-dia {
+    padding: 0 .5rem;
+    color: var(--gris);
+    font-size: .76rem;
+}
+
+.semana-dia b {
+    color: var(--tinta-2);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.semana-dia.fin {
+    color: var(--gris-2);
+}
+
+.semana-dia.hoy,
+.semana-dia.hoy b {
+    color: #7a5d17;
+    font-weight: 700;
+}
+
+.semana-bar {
+    z-index: 1;
+    grid-row: 1;
+    margin: .55rem .25rem;
+    overflow: hidden;
+    padding: .3rem .55rem;
+    border-left: 3px solid var(--dia);
+    border-radius: 4px;
+    color: var(--dia);
+    background: var(--dia-suave);
+    font-size: .74rem;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.semana-bar.hora {
+    border-left-color: var(--hora);
+    color: var(--hora);
+    background: var(--hora-suave);
+}
+
+.semana-bar.vacaciones {
+    border-left-color: var(--vac);
+    color: var(--vac);
+    background: var(--vac-suave);
+}
+
+/* ---- Mes: calendario de vacaciones (domingo a sábado, una fila por semana) ----------- */
+.calendario-mes {
+    width: 100%;
+    margin-top: .25rem;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+.calendario-mes th {
+    padding: .5rem .25rem;
+    border: 1px solid #2e3b4e;
+    color: #fff;
+    background: #2e3b4e;
+    font-size: .74rem;
+    font-weight: 700;
+    letter-spacing: .03em;
+    text-align: center;
+}
+
+.calendario-mes td {
+    height: 6.25rem;
+    padding: .35rem;
+    overflow: hidden;
+    border: 1px solid var(--linea-2);
+    background: #fff;
+    vertical-align: top;
+}
+
+/* Días de otro mes. */
+.calendario-mes td.fuera {
+    background: #d6dde5;
+}
+
+.calendario-mes td.fin {
+    background: #f7f8fa;
+}
+
+.calendario-mes td.hoy {
+    background: #fbf7ec;
+    box-shadow: inset 0 0 0 2px #c9a347;
+}
+
+.calendario-numero {
+    display: block;
+    margin-bottom: .3rem;
+    color: var(--tinta);
+    font-size: .82rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.calendario-mes td.fin .calendario-numero {
+    color: var(--gris);
+}
+
+.calendario-mes td.hoy .calendario-numero {
+    color: #7a5d17;
+}
+
+.calendario-evento {
+    display: block;
+    margin-top: .2rem;
+    overflow: hidden;
+    padding: .15rem .35rem;
+    border-left: 3px solid var(--vac);
+    border-radius: 3px;
+    color: var(--vac);
+    background: var(--vac-suave);
+    font-size: .68rem;
+    font-weight: 600;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.calendario-mas {
+    display: block;
+    margin-top: .2rem;
+    color: var(--gris);
+    font-size: .66rem;
+}
+
+/* Quién es cada color, bajo el calendario. */
+.calendario-leyenda {
+    margin-top: 1rem;
+    padding: .85rem 1rem;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    background: #f7f8fa;
+}
+
+.calendario-leyenda h3 {
+    margin: 0 0 .6rem;
+    color: var(--tinta);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.calendario-leyenda ul {
+    display: grid;
     gap: .45rem;
-    padding: .4rem .7rem;
-    border: 1px solid #e1ebe8;
-    border-radius: 999px;
-    background: #f8fbfa;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.calendario-leyenda li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem .65rem;
     font-size: .8rem;
 }
 
-.hoy-detalle,
-.hoy-empty {
-    color: #718080;
+.calendario-leyenda i {
+    flex: none;
+    width: .8rem;
+    height: .8rem;
+    border-radius: 3px;
 }
 
-.hoy-empty {
+.calendario-leyenda small {
+    color: var(--gris);
+}
+
+.calendario-leyenda-fechas {
+    margin-left: auto;
+    color: var(--tinta-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.calendario-leyenda-dias {
+    min-width: 7rem;
+    color: var(--gris);
+    text-align: right;
+}
+
+@media (max-width: 760px) {
+    .calendario-mes td {
+        height: 4.5rem;
+        padding: .2rem;
+    }
+
+    .calendario-mes th {
+        font-size: .62rem;
+    }
+
+    .calendario-evento {
+        padding: .1rem .2rem;
+        font-size: .6rem;
+    }
+}
+
+/* ---- Mes: lista ---------------------------------------------------------------------- */
+.mes-lista {
     margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.mes-lista li {
+    display: grid;
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.3fr) 6.5rem 7rem;
+    align-items: center;
+    gap: 1rem;
+    min-height: 3rem;
+    padding: .35rem 0;
+    border-top: 1px solid var(--linea);
+    font-size: .84rem;
+}
+
+.mes-lista li:last-child {
+    border-bottom: 1px solid var(--linea);
+}
+
+.mes-fecha {
+    color: var(--tinta-2);
+    font-variant-numeric: tabular-nums;
+}
+
+.mes-duracion {
+    color: var(--tinta-2);
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.mes-lista + .field-hint {
+    margin-top: .75rem;
+}
+
+/* ---- Lateral: el mes agrupado ------------------------------------------------------ */
+.vista-aside {
+    display: grid;
+    align-content: start;
+    gap: 1.1rem;
+    padding: 1.4rem 1.4rem 1.6rem;
+    border-left: 1px solid var(--linea);
+    background: #fafbfc;
+    border-radius: 0 var(--radio-grande) var(--radio-grande) 0;
+}
+
+.vista-aside h2 {
+    font-size: .95rem;
+    font-weight: 650;
+}
+
+.mes-totales {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+    margin: 0;
+}
+
+.mes-totales div {
+    padding: .7rem .8rem;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    background: var(--superficie);
+}
+
+.mes-totales dt {
+    color: var(--gris);
+    font-size: .76rem;
+}
+
+.mes-totales dd {
+    margin: .1rem 0 0;
+    color: var(--tinta);
+    font-size: 1.25rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+.ranking {
+    display: grid;
+    gap: .7rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.ranking li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: .3rem .75rem;
     font-size: .82rem;
 }
 
-/* ---- Tablas ------------------------------------------------------------------------ */
-/* taller.component.css fija un ancho mínimo muy grande; estas tablas tienen menos columnas. */
-.resumen-table {
-    min-width: 720px;
+.ranking-nombre {
+    overflow: hidden;
+    color: var(--tinta-2);
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
-.permisos-table {
-    min-width: 1300px;
-}
-
-th.num,
-td.num {
-    text-align: right;
+.ranking-total {
+    color: var(--tinta);
+    font-weight: 700;
     font-variant-numeric: tabular-nums;
+}
+
+.ranking-barra {
+    grid-column: 1 / -1;
+    height: 6px;
+    overflow: hidden;
+    border-radius: 3px;
+    background: var(--linea);
+}
+
+.ranking-barra i {
+    display: block;
+    height: 100%;
+    border-radius: 3px;
+    background: var(--primario);
+}
+
+/* Lo registrado por estado, al pie del lateral. */
+.registro-totales {
+    padding-top: 1rem;
+    border-top: 1px solid var(--linea);
+}
+
+.registro-totales h3 {
+    margin-bottom: .5rem;
+    color: var(--gris);
+    font-size: .8rem;
+    font-weight: 600;
+}
+
+.registro-totales dl {
+    display: grid;
+    gap: .35rem;
+    margin: 0;
+}
+
+.registro-totales dl div {
+    display: flex;
+    justify-content: space-between;
+    font-size: .84rem;
+}
+
+.registro-totales dt {
+    color: var(--tinta-2);
+}
+
+.registro-totales dd {
+    margin: 0;
+    color: var(--tinta);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+}
+
+/* ---- Registro ---------------------------------------------------------------------- */
+.workspace .permisos-table {
+    min-width: 1180px;
+}
+
+/* Vacaciones: menos columnas (sin horario ni motivo). */
+.workspace .permisos-table.vacaciones-table {
+    min-width: 900px;
+}
+
+.empleado-cell {
+    min-width: 14rem;
+}
+
+.nowrap {
+    white-space: nowrap;
 }
 
 .motivo-cell {
@@ -161,82 +878,130 @@ td.num {
 
 .no-pago {
     display: block;
-    color: #718080;
-    font-size: .7rem;
+    color: var(--gris);
+    font-size: .74rem;
+    font-weight: 400;
 }
 
-.permiso-anulado td {
-    color: #8a9896;
+.permisos-date {
+    width: auto !important;
 }
 
-.tipo-badge,
-.estado-badge {
-    display: inline-block;
-    padding: .2rem .55rem;
-    border-radius: 999px;
-    color: #1f6b43;
-    background: #dcecd8;
-    font-size: .7rem;
-    font-weight: 700;
-    white-space: nowrap;
+/* ---- Ventanas de permisos ---------------------------------------------------------- */
+.tipo-selector {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .25rem;
+    padding: .25rem;
+    border-radius: var(--radio);
+    background: var(--papel);
 }
 
-.tipo-badge.hora {
-    color: #28658a;
-    background: #dceefa;
+.tipo-option {
+    padding: .55rem .8rem;
+    border: 0;
+    border-radius: 6px;
+    color: var(--gris);
+    background: transparent;
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
 }
 
-.estado-badge.anulado {
-    color: #8c2f39;
-    background: #f7dfe1;
+.tipo-option:hover {
+    color: var(--tinta);
 }
 
-/* Activo en la base, pero su hora o su último día ya pasó. */
-.estado-badge.finalizado {
-    color: #55626a;
-    background: #e6eaec;
+/* El tipo elegido va en azul. */
+.tipo-option.selected,
+.tipo-option.selected:hover {
+    color: #fff;
+    background: var(--primario);
+    box-shadow: 0 1px 3px rgba(18, 35, 63, .2);
 }
 
-.permisos-hoy li.finalizado {
-    opacity: .7;
-}
-
-.row-actions {
-    display: flex;
-    flex-direction: column;
-    gap: .35rem;
-    min-width: 6.5rem;
-}
-
-/* ---- Filtros ----------------------------------------------------------------------- */
-.permisos-filters {
+/* Lo que ya lleva el empleado elegido. */
+.consumo-box {
     display: flex;
     flex-wrap: wrap;
-    align-items: center;
-    gap: .6rem;
+    gap: .25rem 1rem;
+    padding: .6rem .8rem;
+    border-left: 3px solid var(--primario);
+    border-radius: 4px;
+    color: var(--tinta-2);
+    background: var(--primario-suave);
+    font-size: .82rem;
 }
 
-.permisos-filters app-table-page-size {
-    margin-bottom: 0;
-    margin-left: auto;
+.consumo-box small {
+    flex-basis: 100%;
+    color: var(--gris);
+}
+
+.anular-text {
+    margin: 0;
+    color: var(--tinta-2);
+    font-size: .9rem;
+}
+
+.anular-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .6rem;
+    margin-top: .75rem;
+}
+
+.workspace .workshop-modal.historial-modal {
+    width: min(920px, 100%);
+}
+
+.historial-totales {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: .75rem;
+    margin-bottom: .75rem;
+}
+
+.historial-totales .kpi-card {
+    display: grid;
+    gap: .15rem;
+    padding: .8rem 1rem;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+}
+
+.kpi-label {
+    color: var(--gris);
+    font-size: .78rem;
+    font-weight: 600;
+}
+
+.historial-valor {
+    color: var(--tinta);
+    font-size: 1rem;
+}
+
+.kpi-caption {
+    color: var(--gris);
+    font-size: .76rem;
 }
 
 /* Empleados del reporte: todos o los marcados en la lista. */
 .report-empleados {
     display: grid;
     gap: .5rem;
-    margin: 0;
+    min-width: 0;
+    margin: .35rem 0 0;
     padding: 0;
     border: 0;
-    min-width: 0;
 }
 
 .report-empleados legend {
     margin-bottom: .35rem;
     padding: 0;
-    color: #294649;
-    font-size: .78rem;
-    font-weight: 700;
+    color: var(--tinta-2);
+    font-size: .82rem;
+    font-weight: 600;
 }
 
 .report-empleados-modo {
@@ -245,31 +1010,13 @@ td.num {
     gap: 1.2rem;
 }
 
-.workshop-modal .check-option {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    color: #203238;
-    font-weight: 400;
-    cursor: pointer;
-}
-
-.workshop-modal .check-option input {
-    flex: none;
-    width: 1rem;
-    height: 1rem;
-    margin: 0;
-    padding: 0;
-    accent-color: #276968;
-}
-
 .report-empleados-acciones {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: .4rem;
-    color: #718080;
-    font-size: .78rem;
+    color: var(--gris);
+    font-size: .8rem;
 }
 
 .report-empleados-acciones span {
@@ -281,326 +1028,189 @@ td.num {
     gap: .45rem;
     max-height: 14rem;
     overflow-y: auto;
-    padding: .6rem .7rem;
-    border: 1px solid #d7e2df;
-    border-radius: 4px;
-    font-size: .82rem;
+    padding: .6rem .75rem;
+    border: 1px solid var(--linea-2);
+    border-radius: var(--radio);
+    font-size: .84rem;
 }
 
-/* Desde qué fecha están cargados los permisos de la tabla. */
-.permisos-filters + .field-hint {
-    margin: .45rem 0 .2rem;
-}
-
-.permisos-search,
-.permisos-filters select,
-.inline-filter select {
-    min-height: 2.4rem;
-    padding: .45rem .75rem;
-    border: 1px solid #d3dfdb;
-    border-radius: 8px;
-    color: #203238;
-    background: #fff;
-    font: inherit;
-}
-
-.permisos-search {
-    flex: 0 1 22rem;
-}
-
-.permisos-date {
-    min-height: 2.4rem;
-    padding: .35rem .6rem;
-    border: 1px solid #d3dfdb;
-    border-radius: 8px;
-    color: #203238;
-    background: #fff;
-    font: inherit;
-    font-size: .85rem;
-}
-
-.permisos-date:focus {
-    border-color: #276968;
-    outline: none;
-}
-
-.link-button {
-    padding: .3rem .4rem;
-    border: 0;
-    color: #276968;
-    background: transparent;
-    box-shadow: none;
-    cursor: pointer;
-    font: inherit;
-    font-size: .8rem;
-    font-weight: 700;
-    text-decoration: underline;
-}
-
-/* Nombre del empleado en la tabla: abre su historial. */
-.empleado-link {
-    padding: 0;
-    border: 0;
-    color: #18383b;
-    background: transparent;
-    box-shadow: none;
-    cursor: pointer;
-    font: inherit;
-    text-align: left;
-}
-
-.empleado-link:hover,
-.empleado-link:focus-visible {
-    color: #276968;
-    text-decoration: underline;
-}
-
-/* Lo que ya lleva el empleado elegido en el formulario. */
-.consumo-box {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .25rem 1rem;
-    padding: .6rem .8rem;
-    border-left: 3px solid #276968;
-    border-radius: 4px;
-    color: #294649;
-    background: #f4f8f7;
-    font-size: .8rem;
-}
-
-.consumo-box small {
-    flex-basis: 100%;
-    color: #718080;
-}
-
-/* ---- Historial por empleado -------------------------------------------------------- */
-.workshop-modal.historial-modal {
-    width: min(900px, 100%);
-}
-
-.historial-totales {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: .75rem;
-    margin-bottom: .5rem;
-}
-
-.historial-valor {
-    color: #18383b;
-    font-size: 1.05rem;
-}
-
-@media (max-width: 640px) {
-    .historial-totales {
-        grid-template-columns: 1fr;
-    }
-}
-
-.permisos-filters select,
-.inline-filter select {
-    width: auto;
-}
-
-.permisos-search:focus,
-.permisos-filters select:focus,
-.inline-filter select:focus {
-    border-color: #276968;
-    outline: none;
-}
-
-.inline-filter {
-    display: inline-flex;
-    align-items: center;
-    gap: .5rem;
-    color: #617573;
-    font-size: .8rem;
-    font-weight: 600;
-}
-
-.field-hint {
-    margin: 0;
-    color: #718080;
-    font-size: .76rem;
-}
-
-/* ---- Formularios ------------------------------------------------------------------- */
-.form-pair {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: .75rem;
-}
-
-.form-pair label {
-    display: block;
-    margin-bottom: .35rem;
-}
-
-/* Tipo de permiso del formulario: dos opciones que se ven como botones de un mismo grupo. */
-.form-label {
-    color: #294649;
-    font-size: .78rem;
-    font-weight: 700;
-}
-
-.tipo-selector {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    border: 1px solid #d7e2df;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.workshop-modal .tipo-selector button {
-    padding: .7rem .8rem;
-    border: 0;
-    border-radius: 0;
-    color: #405457;
-    background: #ffffff;
-    box-shadow: none;
-    cursor: pointer;
-    font: inherit;
-    font-size: .88rem;
-    font-weight: 700;
-}
-
-.workshop-modal .tipo-selector button + button {
-    border-left: 1px solid #d7e2df;
-}
-
-.workshop-modal .tipo-selector button.selected {
-    color: #ffffff;
-    background: #276968;
-}
-
-.form-preview {
-    margin: 0;
-    padding: .6rem .8rem;
-    border-radius: 4px;
-    color: #276968;
-    background: #eef5f2;
-    font-size: .8rem;
-}
-
-.anular-text {
-    margin: 0;
-    color: #405457;
-    font-size: .85rem;
-}
-
-.anular-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: .6rem;
-    margin-top: .5rem;
-}
-
-.workshop-modal .anular-actions button {
-    margin-top: 0;
-    padding: .75rem 1rem;
-}
-
-.workshop-modal button.danger-solid {
-    background: #9b3f38;
-}
-
-.workshop-modal button.danger-solid:hover {
-    background: #7f322c;
-    box-shadow: none;
-}
-
-/* ---- Personal y áreas -------------------------------------------------------------- */
-.personal-add {
-    display: flex;
-    flex-wrap: wrap;
+/* ---- Vacaciones: varios períodos en una solicitud ----------------------------------- */
+/* Inicio, finalización y "+" en una fila; los períodos ya agregados, en una lista encima. */
+.form-pair.vac-rango {
+    grid-template-columns: 1fr 1fr auto;
     align-items: end;
-    gap: .75rem;
 }
 
-.personal-add-field {
+.vac-agregar.secondary {
+    width: 2.5rem;
+    padding: 0;
+    color: var(--primario);
+}
+
+.vac-agregar svg {
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2.2;
+    stroke-linecap: round;
+}
+
+.vac-periodos {
     display: grid;
-    flex: 0 1 28rem;
     gap: .35rem;
-    min-width: 0;
+    margin: 0;
+    padding: 0;
+    list-style: none;
 }
 
-.personal-add-field label {
-    color: #294649;
-    font-size: .78rem;
-    font-weight: 700;
-}
-
-.personal-add button {
-    padding: .75rem 1.2rem;
-    border: 0;
-    border-radius: 5px;
-    color: #fff;
-    background: #276968;
-    cursor: pointer;
-    font-weight: 700;
-}
-
-.personal-add button:disabled {
-    cursor: not-allowed;
-    opacity: .55;
-}
-
-.row-select {
-    width: auto;
-    min-width: 11rem;
-    padding: .4rem .6rem;
-    border: 1px solid #d3dfdb;
-    border-radius: 6px;
-    background: #fff;
-    font: inherit;
-}
-
-.row-actions-inline {
-    flex-direction: row;
-    flex-wrap: wrap;
-}
-
-.jefes-table {
-    min-width: 900px;
-}
-
-.check-option {
+.vac-periodos li {
     display: flex;
-    align-items: flex-start;
-    gap: .55rem;
-    margin-top: .4rem;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .35rem .75rem;
+    padding: .45rem .5rem .45rem .75rem;
+    border: 1px solid var(--linea-2);
+    border-left: 3px solid var(--vac);
+    border-radius: var(--radio);
+    background: var(--vac-suave);
+    font-size: .84rem;
+}
+
+.vac-periodo-rango {
+    flex: 1 1 12rem;
+    color: var(--tinta);
     font-weight: 600;
-    cursor: pointer;
 }
 
-.workshop-modal .check-option input {
-    width: auto;
-    margin: .15rem 0 0;
-}
-
-@media (max-width: 900px) {
-    .permisos-kpis {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+.vac-periodo-dias {
+    color: var(--vac);
+    font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 560px) {
-    .permisos-kpis,
-    .form-pair {
+    .form-pair.vac-rango {
+        grid-template-columns: 1fr auto;
+    }
+
+    .form-pair.vac-rango > div:first-child {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ---- Pantallas angostas ------------------------------------------------------------ */
+@media (max-width: 1180px) {
+    .vista-body {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .vista-aside {
+        border-top: 1px solid var(--linea);
+        border-left: 0;
+        border-radius: 0 0 var(--radio-grande) var(--radio-grande);
+    }
+}
+
+@media (max-width: 900px) {
+    .app-frame {
+        grid-template-columns: minmax(0, 1fr);
+        grid-template-rows: auto 1fr;
+    }
+
+    .nav-item {
+        flex: none;
+        width: auto;
+        padding: .5rem .75rem;
+        white-space: nowrap;
+    }
+
+    .nav-item.active::before {
+        top: auto;
+        right: .75rem;
+        bottom: -.15rem;
+        left: .75rem;
+        width: auto;
+        height: 3px;
+        border-radius: 3px 3px 0 0;
+    }
+
+    .topbar-tools {
+        justify-content: flex-start;
+    }
+}
+
+@media (max-width: 640px) {
+    .workspace {
+        padding: 1rem 1rem 2.5rem;
+    }
+
+    .timeline,
+    .semana {
+        --persona: 8.5rem;
+    }
+
+    .vista-tab {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: .7rem .8rem .8rem;
+    }
+
+    .vista-tab.active::before {
+        right: .8rem;
+        left: .8rem;
+    }
+
+    .vista-label {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    /* Eje cada dos horas y barras sin texto: el detalle va bajo el nombre. */
+    .timeline-axis span:nth-child(even) {
+        display: none;
+    }
+
+    .timeline-bar {
+        padding: 0;
+        font-size: 0;
+    }
+
+    .vista-tab .kpi-value {
+        font-size: 1.6rem;
+    }
+
+    .vista-caption {
+        display: none;
+    }
+
+    .vista-panel {
+        padding: 1.1rem 1rem 1.25rem;
+    }
+
+    .mes-lista li {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: .2rem .75rem;
+        padding: .55rem 0;
+    }
+
+    .mes-fecha {
+        grid-column: 1;
+    }
+
+    .mes-duracion {
+        grid-column: 2;
+        grid-row: 1;
+    }
+
+    .historial-totales {
         grid-template-columns: 1fr;
     }
 
-    .permisos-filters app-table-page-size {
-        margin-left: 0;
+    .area-filter-bar,
+    .area-filter-bar label,
+    .area-filter-bar select {
+        width: 100%;
+        max-width: none;
     }
-}
-
-/* Búsqueda de la cuenta de inventario por usuario exacto (administrador de departamento). */
-.acceso-busqueda {
-  display: flex;
-  gap: 8px;
-}
-
-.acceso-busqueda input {
-  flex: 1;
-  min-width: 0;
 }

@@ -38,8 +38,14 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                 valores.AddRange([("alcanceArea", alcance.IdArea), ("alcanceDepto", alcance.IdDepartamento)]);
                 break;
             case PermisoValores.NivelAdminDepartamento:
+            case PermisoValores.NivelSecretaria:
                 condiciones.Add("(a.DEPARTAMENTO_IHSS_ID = :alcanceDepto OR e.DEPARTAMENTO_IHSS_ID = :alcanceDepto)");
                 valores.Add(("alcanceDepto", alcance.IdDepartamento));
+                break;
+            // El empleado solo ve los suyos, sin importar el área en que se registraron.
+            case PermisoValores.NivelUsuario:
+                condiciones.Add("p.ID_EMPLEADO = :alcanceEmpleado");
+                valores.Add(("alcanceEmpleado", alcance.IdEmpleado));
                 break;
         }
         if (filtro.Desde is { } desde)
@@ -85,11 +91,12 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             }
 
             return await ReadList($"""
-                SELECT p.ID_PERMISO, p.TIPO, p.ID_EMPLEADO, e.NOMBRE_EMPLEADO AS EMPLEADO, TRIM(e.NPAGO) AS NO_PAGO,
+                SELECT p.ID_PERMISO, p.TIPO, p.ID_EMPLEADO, e.NOMBRE_EMPLEADO AS EMPLEADO, p.NO_PAGO,
                        p.MOTIVO, p.FECHA_INICIO, p.FECHA_FIN, p.HORA_SALIDA, p.HORA_ENTRADA,
                        p.DIAS_HABILES, p.MINUTOS, p.FECHA_SOLICITUD,
                        p.ESTADO, p.FECHA_REGISTRO, p.ID_AREA, a.NOMBRE AS NOMBRE_AREA,
                        a.DEPARTAMENTO_IHSS_ID, d.DEPARTAMENTO_IHSS_DESC AS NOMBRE_DEPARTAMENTO,
+                       p.LUGAR_SOLICITUD, p.TELEFONO,
                        COALESCE(a.DEPARTAMENTO_IHSS_ID, e.DEPARTAMENTO_IHSS_ID) AS DEPTO_JORNADA
                 FROM PERMISO_SOLICITUD p
                 LEFT JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = p.ID_EMPLEADO
@@ -117,7 +124,9 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                     ReadNullableString(reader, "NOMBRE_AREA"),
                     ReadNullableInt(reader, "DEPARTAMENTO_IHSS_ID"),
                     ReadNullableString(reader, "NOMBRE_DEPARTAMENTO"),
-                    FinJornada(ReadNullableInt(reader, "DEPTO_JORNADA"))),
+                    FinJornada(ReadNullableInt(reader, "DEPTO_JORNADA")),
+                    ReadNullableString(reader, "LUGAR_SOLICITUD"),
+                    ReadNullableString(reader, "TELEFONO")),
                 cancellationToken, [.. valores]);
         }
         finally
@@ -138,13 +147,16 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
         {
             PermisoValores.NivelJefe =>
                 "AND e.DEPARTAMENTO_IHSS_ID = :alcanceDepto AND (ea.ID_AREA = :alcanceArea OR ea.ID_AREA IS NULL)",
-            PermisoValores.NivelAdminDepartamento => "AND e.DEPARTAMENTO_IHSS_ID = :alcanceDepto",
+            PermisoValores.NivelAdminDepartamento or PermisoValores.NivelSecretaria => "AND e.DEPARTAMENTO_IHSS_ID = :alcanceDepto",
+            // El empleado solo se recibe a sí mismo: es el único al que registra permisos.
+            PermisoValores.NivelUsuario => "AND e.EMPLEADOS_IHSS_ID = :alcanceEmpleado",
             _ => string.Empty,
         };
         (string Name, object? Value)[] valores = alcance.Nivel switch
         {
             PermisoValores.NivelJefe => [("alcanceDepto", alcance.IdDepartamento), ("alcanceArea", alcance.IdArea)],
-            PermisoValores.NivelAdminDepartamento => [("alcanceDepto", alcance.IdDepartamento)],
+            PermisoValores.NivelAdminDepartamento or PermisoValores.NivelSecretaria => [("alcanceDepto", alcance.IdDepartamento)],
+            PermisoValores.NivelUsuario => [("alcanceEmpleado", alcance.IdEmpleado)],
             _ => [],
         };
 
@@ -171,16 +183,28 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
     }
 
     public Task CreatePermisoDia(PermisoAlcance alcance, SavePermisoDiaDto permiso, CancellationToken cancellationToken) =>
-        Guardar(alcance, null, SolicitudDia(permiso), cancellationToken);
+        Guardar(alcance, null, [SolicitudDia(permiso)], cancellationToken);
 
     public Task<bool> UpdatePermisoDia(PermisoAlcance alcance, int idPermiso, SavePermisoDiaDto permiso, CancellationToken cancellationToken) =>
-        Guardar(alcance, idPermiso, SolicitudDia(permiso), cancellationToken);
+        Guardar(alcance, idPermiso, [SolicitudDia(permiso)], cancellationToken);
 
     public Task CreatePermisoHora(PermisoAlcance alcance, SavePermisoHoraDto permiso, CancellationToken cancellationToken) =>
-        Guardar(alcance, null, SolicitudHora(permiso), cancellationToken);
+        Guardar(alcance, null, [SolicitudHora(permiso)], cancellationToken);
 
     public Task<bool> UpdatePermisoHora(PermisoAlcance alcance, int idPermiso, SavePermisoHoraDto permiso, CancellationToken cancellationToken) =>
-        Guardar(alcance, idPermiso, SolicitudHora(permiso), cancellationToken);
+        Guardar(alcance, idPermiso, [SolicitudHora(permiso)], cancellationToken);
+
+    // Un registro por período, todos con la misma fecha de solicitud.
+    public Task CreateVacaciones(PermisoAlcance alcance, SaveVacacionesDto vacaciones, CancellationToken cancellationToken) =>
+        Guardar(alcance, null,
+            [.. (vacaciones.Periodos ?? []).Select(periodo => SolicitudVacacion(
+                vacaciones.IdEmpleado, periodo.FechaInicio, periodo.FechaFin, vacaciones.FechaSolicitud))],
+            cancellationToken);
+
+    public Task<bool> UpdateVacacion(PermisoAlcance alcance, int idPermiso, SaveVacacionDto vacacion, CancellationToken cancellationToken) =>
+        Guardar(alcance, idPermiso,
+            [SolicitudVacacion(vacacion.IdEmpleado, vacacion.FechaInicio, vacacion.FechaFin, vacacion.FechaSolicitud)],
+            cancellationToken);
 
     // Anular conserva el registro, pero deja de contar en los totales, los choques y los límites.
     // Cada usuario solo anula permisos de su alcance, y solo mientras no hayan finalizado.
@@ -245,6 +269,52 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
               {DentroDelAlcance(alcance, "ae.ID_AREA")}
             """, cancellationToken, [("idEmpleado", idEmpleado), .. alcance.ParametrosArea()]) > 0;
 
+    // Guarda el No. de pago del empleado (EMPLEADOS_IHSS.NPAGO), el que el formulario del permiso
+    // carga al elegirlo; vacío lo borra. Solo empleados activos de departamentos habilitados dentro
+    // del alcance: el jefe, los de su área; el administrador de departamento, los de su
+    // departamento; el general, todos. Dos empleados activos no pueden tener el mismo número.
+    public Task<bool> GuardarNoPagoEmpleado(PermisoAlcance alcance, int idEmpleado, string? noPago, CancellationToken cancellationToken) =>
+        InTransaction(async (connection, transaction) =>
+        {
+            var valor = string.IsNullOrWhiteSpace(noPago) ? null : noPago.Trim();
+            var filtro = alcance.Nivel switch
+            {
+                PermisoValores.NivelJefe => """
+                    AND e.DEPARTAMENTO_IHSS_ID = :alcanceDepto
+                    AND EXISTS (SELECT 1 FROM PERMISO_AREA_EMPLEADO ae JOIN PERMISO_AREA a ON a.ID_AREA = ae.ID_AREA
+                                WHERE ae.ID_EMPLEADO = e.EMPLEADOS_IHSS_ID AND ae.ID_AREA = :alcanceArea
+                                  AND a.DEPARTAMENTO_IHSS_ID = e.DEPARTAMENTO_IHSS_ID)
+                    """,
+                PermisoValores.NivelAdminDepartamento or PermisoValores.NivelSecretaria => "AND e.DEPARTAMENTO_IHSS_ID = :alcanceDepto",
+                _ => string.Empty,
+            };
+            (string Name, object? Value)[] valores = alcance.Nivel switch
+            {
+                PermisoValores.NivelJefe => [("alcanceDepto", alcance.IdDepartamento), ("alcanceArea", alcance.IdArea)],
+                PermisoValores.NivelAdminDepartamento or PermisoValores.NivelSecretaria => [("alcanceDepto", alcance.IdDepartamento)],
+                _ => [],
+            };
+
+            if (valor is not null)
+            {
+                var otro = await ReadRows(connection, transaction, """
+                    SELECT NOMBRE_EMPLEADO FROM EMPLEADOS_IHSS
+                    WHERE TRIM(NPAGO) = :noPago AND EMPLEADOS_IHSS_ID <> :idEmpleado AND ESTADO = 1 AND ROWNUM = 1
+                    """, reader => ReadString(reader, "NOMBRE_EMPLEADO").Trim(),
+                    cancellationToken, ("noPago", valor), ("idEmpleado", idEmpleado));
+                if (otro.Count > 0) throw new ArgumentException($"El No. de pago {valor} ya lo tiene {otro[0]}.");
+            }
+
+            return await Execute(connection, transaction, $"""
+                UPDATE EMPLEADOS_IHSS e SET e.NPAGO = :noPago
+                WHERE e.EMPLEADOS_IHSS_ID = :idEmpleado
+                  AND e.ESTADO = 1
+                  AND EXISTS (SELECT 1 FROM PERMISO_DEPARTAMENTO pd
+                              WHERE pd.DEPARTAMENTO_IHSS_ID = e.DEPARTAMENTO_IHSS_ID AND pd.ESTADO = 'ACTIVO')
+                  {filtro}
+                """, cancellationToken, [("noPago", valor), ("idEmpleado", idEmpleado), .. valores]) > 0;
+        }, cancellationToken);
+
     // "AND EXISTS (...)" que limita una fila con área (columna indicada) al alcance del usuario;
     // vacío para quien ve todo. Usa los parámetros de PermisoAlcance.ParametrosArea().
     private static string DentroDelAlcance(PermisoAlcance alcance, string columnaArea) =>
@@ -255,20 +325,28 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
     private static Solicitud SolicitudDia(SavePermisoDiaDto permiso) => new(
         PermisoValores.TipoDia, permiso.IdEmpleado, permiso.Motivo.Trim(),
         permiso.FechaInicio.Date, permiso.FechaFin.Date, null, null,
-        permiso.FechaSolicitud.Date);
+        NoPago: permiso.NoPago?.Trim(), Lugar: permiso.Lugar?.Trim(), Telefono: permiso.Telefono?.Trim());
 
     private static Solicitud SolicitudHora(SavePermisoHoraDto permiso) => new(
         PermisoValores.TipoHora, permiso.IdEmpleado, permiso.Motivo.Trim(),
         permiso.Fecha.Date, permiso.Fecha.Date,
-        ParseHora(permiso.HoraSalida, "salida"), ParseHora(permiso.HoraEntrada, "entrada"),
-        permiso.FechaSolicitud.Date);
+        ParseHora(permiso.HoraSalida, "salida"), ParseHora(permiso.HoraEntrada, "regreso"), NoPago: permiso.NoPago?.Trim());
 
-    // Alta (idPermiso null) o edición. Todo ocurre en una transacción con la tabla bloqueada,
+    // Las vacaciones no llevan motivo; la columna lo exige, así que se guarda "VACACIONES".
+    private static Solicitud SolicitudVacacion(int idEmpleado, DateTime fechaInicio, DateTime fechaFin, DateTime fechaSolicitud) => new(
+        PermisoValores.TipoVacaciones, idEmpleado, "VACACIONES", fechaInicio.Date, fechaFin.Date, null, null, fechaSolicitud.Date);
+
+    // Alta (idPermiso null) o edición. En los permisos la fecha de solicitud es la del día del alta
+    // (la del servidor) y no cambia al editar; en las vacaciones es la que se indica. Todo ocurre en una transacción con la tabla bloqueada,
     // para que dos registros simultáneos del mismo empleado no pasen ambos la revisión de choques.
-    // Devuelve false si el permiso a editar no existe o está fuera del alcance del usuario.
-    private Task<bool> Guardar(PermisoAlcance alcance, int? idPermiso, Solicitud nueva, CancellationToken cancellationToken) =>
+    // nuevas: una solicitud, o varios períodos de vacaciones del mismo empleado (solo en el alta);
+    // se guardan todos o ninguno. Devuelve false si el permiso a editar no existe o está fuera del
+    // alcance del usuario.
+    private Task<bool> Guardar(PermisoAlcance alcance, int? idPermiso, IReadOnlyList<Solicitud> nuevas, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
+            // Empleado, tipo y fecha de solicitud son los mismos en todos los períodos.
+            var nueva = nuevas[0];
             await LockTable(connection, transaction, "PERMISO_SOLICITUD", cancellationToken);
             // Jornada y límites de todos los departamentos: se leen una vez para el permiso que se
             // edita (su fin) y para el nuevo (sus reglas).
@@ -284,6 +362,14 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                 if (await LeerModificable(connection, transaction, alcance, id, "editar", filasParametros, cancellationToken) is not { } actual)
                 {
                     return false;
+                }
+                // Un permiso no pasa a vacaciones ni al revés: cada uno se edita en su sección.
+                var eranVacaciones = actual.Tipo == PermisoValores.TipoVacaciones;
+                if (eranVacaciones != (nueva.Tipo == PermisoValores.TipoVacaciones))
+                {
+                    throw new ArgumentException(eranVacaciones
+                        ? "Ese registro son vacaciones: se editan en la sección Vacaciones."
+                        : "Ese registro es un permiso: se edita en la sección Permisos.");
                 }
                 if (actual.IdEmpleado == nueva.IdEmpleado && actual.IdArea is not null) idArea = actual.IdArea;
             }
@@ -306,10 +392,10 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             // Años que toca el permiso: alcanzan para contar sus días y para los límites. Un choque
             // o un permiso que sume al mes o al año tiene que tocar esos mismos años, así que los
             // permisos que terminaron antes o empiezan después no hace falta leerlos.
-            var desdeAnio = new DateTime(nueva.FechaInicio.Year, 1, 1);
-            var hastaAnio = new DateTime(nueva.FechaFin.Year + 1, 1, 1);
+            var desdeAnio = new DateTime(nuevas.Min(solicitud => solicitud.FechaInicio).Year, 1, 1);
+            var hastaAnio = new DateTime(nuevas.Max(solicitud => solicitud.FechaFin).Year + 1, 1, 1);
             var feriados = await LeerFeriados(connection, transaction, idDepartamento, desdeAnio, hastaAnio, cancellationToken);
-            var existentes = await ReadRows(connection, transaction, """
+            var existentes = (await ReadRows(connection, transaction, """
                 SELECT TIPO, FECHA_INICIO, FECHA_FIN, HORA_SALIDA, HORA_ENTRADA, MINUTOS
                 FROM PERMISO_SOLICITUD
                 WHERE ID_EMPLEADO = :idEmpleado
@@ -325,26 +411,51 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                     PermisoParametros.TryParseHora(ReadNullableString(reader, "HORA_ENTRADA")),
                     ReadNullableInt(reader, "MINUTOS") ?? 0),
                 cancellationToken, ("idEmpleado", nueva.IdEmpleado), ("idPermiso", idPermiso ?? 0),
-                ("desdeAnio", desdeAnio), ("hastaAnio", hastaAnio));
+                ("desdeAnio", desdeAnio), ("hastaAnio", hastaAnio))).ToList();
 
-            var (dias, minutos) = Calcular(nueva, parametros, feriados);
-            ValidarChoques(nueva, existentes);
-            ValidarLimites(nueva, dias, minutos, existentes, parametros, feriados);
+            // Cada período se revisa contra lo registrado y contra los anteriores de la misma
+            // solicitud; con varios, el mensaje dice cuál falló.
+            var calculadas = new List<(Solicitud Solicitud, int Dias, int Minutos)>();
+            foreach (var solicitud in nuevas)
+            {
+                try
+                {
+                    var (diasSolicitud, minutosSolicitud) = Calcular(solicitud, parametros, feriados);
+                    ValidarChoques(solicitud, existentes);
+                    ValidarLimites(solicitud, diasSolicitud, minutosSolicitud, existentes, parametros, feriados);
+                    calculadas.Add((solicitud, diasSolicitud, minutosSolicitud));
+                    existentes.Add(new Existente(solicitud.Tipo, solicitud.FechaInicio, solicitud.FechaFin,
+                        solicitud.HoraSalida, solicitud.HoraEntrada, minutosSolicitud));
+                }
+                catch (ArgumentException error) when (nuevas.Count > 1)
+                {
+                    throw new ArgumentException(
+                        $"Período del {solicitud.FechaInicio:dd/MM/yyyy} al {solicitud.FechaFin:dd/MM/yyyy}: {error.Message}", error);
+                }
+            }
 
-            (string Name, object? Value)[] valores =
-            [
-                ("idEmpleado", nueva.IdEmpleado), ("motivo", nueva.Motivo),
-                ("fechaInicio", nueva.FechaInicio), ("fechaFin", nueva.FechaFin),
-                ("horaSalida", nueva.HoraSalida?.ToString("HH:mm", CultureInfo.InvariantCulture)),
-                ("horaEntrada", nueva.HoraEntrada?.ToString("HH:mm", CultureInfo.InvariantCulture)),
-                ("diasHabiles", dias), ("minutos", minutos),
-                ("fechaSolicitud", nueva.FechaSolicitud),
-                ("idArea", idArea),
-            ];
+            // La fecha de solicitud indicada (vacaciones) se guarda; sin ella, la del servidor al
+            // registrar, y al editar se conserva.
+            var solicitudIndicada = nueva.FechaSolicitud is not null;
+            (string Name, object? Value)[] Valores(Solicitud solicitud, int dias, int minutos)
+            {
+                (string Name, object? Value)[] valores =
+                [
+                    ("idEmpleado", solicitud.IdEmpleado), ("motivo", solicitud.Motivo),
+                    ("fechaInicio", solicitud.FechaInicio), ("fechaFin", solicitud.FechaFin),
+                    ("horaSalida", solicitud.HoraSalida?.ToString("HH:mm", CultureInfo.InvariantCulture)),
+                    ("horaEntrada", solicitud.HoraEntrada?.ToString("HH:mm", CultureInfo.InvariantCulture)),
+                    ("diasHabiles", dias), ("minutos", minutos),
+                    ("idArea", idArea), ("tipo", solicitud.Tipo), ("noPago", solicitud.NoPago),
+                    ("lugar", solicitud.Lugar), ("telefono", solicitud.Telefono),
+                ];
+                return solicitud.FechaSolicitud is { } fechaSolicitud ? [.. valores, ("fechaSolicitud", fechaSolicitud)] : valores;
+            }
 
             if (idPermiso is { } idActual)
             {
-                await Execute(connection, transaction, """
+                var (editada, dias, minutos) = calculadas[0];
+                await Execute(connection, transaction, $"""
                     UPDATE PERMISO_SOLICITUD
                     SET TIPO = :tipo,
                         ID_EMPLEADO = :idEmpleado,
@@ -355,25 +466,32 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
                         HORA_ENTRADA = :horaEntrada,
                         DIAS_HABILES = :diasHabiles,
                         MINUTOS = :minutos,
-                        FECHA_SOLICITUD = :fechaSolicitud,
+                        NO_PAGO = :noPago,
+                        LUGAR_SOLICITUD = :lugar,
+                        TELEFONO = :telefono,
+                        {(solicitudIndicada ? "FECHA_SOLICITUD = :fechaSolicitud," : string.Empty)}
                         ID_AREA = :idArea
                     WHERE ID_PERMISO = :idPermiso
-                    """, cancellationToken, [.. valores, ("idPermiso", idActual), ("tipo", nueva.Tipo)]);
+                    """, cancellationToken, [.. Valores(editada, dias, minutos), ("idPermiso", idActual)]);
                 return true;
             }
 
-            var nuevoId = await NextId(connection, transaction, "PERMISO_SOLICITUD", "ID_PERMISO", cancellationToken,
-                tablaBloqueada: true);
-            await Execute(connection, transaction, """
-                INSERT INTO PERMISO_SOLICITUD
-                    (ID_PERMISO, TIPO, ID_EMPLEADO, MOTIVO, FECHA_INICIO, FECHA_FIN,
-                     HORA_SALIDA, HORA_ENTRADA, DIAS_HABILES, MINUTOS,
-                     FECHA_SOLICITUD, ESTADO, FECHA_REGISTRO, ID_AREA)
-                VALUES
-                    (:idPermiso, :tipo, :idEmpleado, :motivo, :fechaInicio, :fechaFin,
-                     :horaSalida, :horaEntrada, :diasHabiles, :minutos,
-                     :fechaSolicitud, 'ACTIVO', SYSDATE, :idArea)
-                """, cancellationToken, [.. valores, ("idPermiso", nuevoId), ("tipo", nueva.Tipo)]);
+            // La tabla sigue bloqueada: cada período toma el siguiente ID.
+            foreach (var (solicitud, dias, minutos) in calculadas)
+            {
+                var nuevoId = await NextId(connection, transaction, "PERMISO_SOLICITUD", "ID_PERMISO", cancellationToken,
+                    tablaBloqueada: true);
+                await Execute(connection, transaction, $"""
+                    INSERT INTO PERMISO_SOLICITUD
+                        (ID_PERMISO, TIPO, ID_EMPLEADO, MOTIVO, FECHA_INICIO, FECHA_FIN,
+                         HORA_SALIDA, HORA_ENTRADA, DIAS_HABILES, MINUTOS, NO_PAGO, LUGAR_SOLICITUD, TELEFONO,
+                         FECHA_SOLICITUD, ESTADO, FECHA_REGISTRO, ID_AREA)
+                    VALUES
+                        (:idPermiso, :tipo, :idEmpleado, :motivo, :fechaInicio, :fechaFin,
+                         :horaSalida, :horaEntrada, :diasHabiles, :minutos, :noPago, :lugar, :telefono,
+                         {(solicitudIndicada ? ":fechaSolicitud" : "TRUNC(SYSDATE)")}, 'ACTIVO', SYSDATE, :idArea)
+                    """, cancellationToken, [.. Valores(solicitud, dias, minutos), ("idPermiso", nuevoId)]);
+            }
             return true;
         }, cancellationToken);
 
@@ -417,9 +535,13 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             ? alcance.IncluyeArea(area, departamento)
             : alcance.VeTodo;
         if (!dentro) return null;
+        // Los mensajes nombran lo que se modifica: un permiso o unas vacaciones.
+        var vacaciones = actual.Tipo == PermisoValores.TipoVacaciones;
         if (actual.Estado != PermisoValores.Activo)
         {
-            throw new ArgumentException($"El permiso está anulado y ya no se puede {accion}.");
+            throw new ArgumentException(vacaciones
+                ? $"Las vacaciones están anuladas y ya no se pueden {accion}."
+                : $"El permiso está anulado y ya no se puede {accion}.");
         }
 
         var parametros = actual.IdDepartamentoJornada is { } deptoJornada
@@ -428,7 +550,9 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             : PermisoParametros.PorDefecto;
         if (Finalizado(actual.Tipo, actual.FechaFin, actual.HoraEntrada, parametros.FinJornada, DateTime.Now))
         {
-            throw new ArgumentException($"El permiso ya finalizó y no se puede {accion}.");
+            throw new ArgumentException(vacaciones
+                ? $"Las vacaciones ya finalizaron y no se pueden {accion}."
+                : $"El permiso ya finalizó y no se puede {accion}.");
         }
         return actual;
     }
@@ -471,10 +595,16 @@ public sealed class PermisoService(PermisosDbContext dbContext) : OracleReposito
             WHERE ae.ID_EMPLEADO = :idEmpleado
             """, reader => (IdArea: ReadInt(reader, "ID_AREA"), IdDepartamento: ReadInt(reader, "DEPARTAMENTO_IHSS_ID")),
             cancellationToken, ("idEmpleado", idEmpleado));
+        // El empleado solo se registra permisos a sí mismo.
+        if (!alcance.IncluyeEmpleado(idEmpleado))
+        {
+            throw new ArgumentException("Tu usuario solo puede registrar tus propios permisos y vacaciones.");
+        }
         if (filas.Count == 0)
         {
-            throw new ArgumentException(
-                "El empleado no tiene un área asignada en su departamento. Agrégalo primero en la sección Personal.");
+            throw new ArgumentException(alcance.EsEmpleado
+                ? "Todavía no estás asignado a un área de tu departamento. Pídele a tu jefe que te agregue en Personal."
+                : "El empleado no tiene un área asignada en su departamento. Agrégalo primero en la sección Personal.");
         }
         if (!alcance.IncluyeArea(filas[0].IdArea, filas[0].IdDepartamento))
         {

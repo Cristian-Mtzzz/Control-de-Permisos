@@ -78,7 +78,7 @@ public sealed class AuthController(
 
     [HttpPost("refresh")]
     [Authorize(Policy = "PasswordChange")]
-    // El token nuevo se arma con los datos actuales de USUARIOS, no con los del token anterior;
+    // El token nuevo se arma con los datos actuales de USUARIOS_PERMISOS, no con los del token anterior;
     // solo el inicio de sesión pasa de uno a otro, para la duración máxima de la sesión.
     public async Task<ActionResult> RefreshSession(CancellationToken cancellationToken)
     {

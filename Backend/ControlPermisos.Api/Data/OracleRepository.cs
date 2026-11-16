@@ -194,6 +194,8 @@ public abstract class OracleRepository(PermisosDbContext dbContext)
                 long => DbType.Int64,
                 decimal => DbType.Decimal,
                 DateTime => DbType.DateTime,
+                // Imágenes de los formatos de impresión (BLOB).
+                byte[] => DbType.Binary,
                 _ => DbType.String,
             };
             parameter.Value = value ?? DBNull.Value;
@@ -201,6 +203,13 @@ public abstract class OracleRepository(PermisosDbContext dbContext)
         }
 
         return command;
+    }
+
+    /// <summary>Contenido de una columna BLOB; vacío si viene nula.</summary>
+    protected static byte[] ReadBytes(DbDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? [] : (byte[])reader.GetValue(ordinal);
     }
 
     protected static string ReadString(DbDataReader reader, string column)

@@ -1,4 +1,5 @@
 import { Component, computed, input, model, Pipe, PipeTransform } from '@angular/core';
+import { SearchableSelectDirective } from './searchable-select.directive';
 
 export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
@@ -24,10 +25,11 @@ export class PagePipe implements PipeTransform {
  */
 @Component({
   selector: 'app-table-page-size',
+  imports: [SearchableSelectDirective],
   template: `
     <label class="table-page-size">
       Mostrar
-      <select [value]="pageSize()" (change)="changePageSize($any($event.target).value)">
+      <select sinBusqueda [value]="pageSize()" (change)="changePageSize($any($event.target).value)">
         @for (size of pageSizes; track size) { <option [value]="size" [selected]="size === pageSize()">{{ size }}</option> }
       </select>
       registros
@@ -43,18 +45,12 @@ export class PagePipe implements PipeTransform {
       display: inline-flex;
       align-items: center;
       gap: .45rem;
-      color: #617573;
-      font-size: .8rem;
-      font-weight: 600;
+      color: var(--gris);
+      font-size: .82rem;
+      font-weight: 500;
     }
     .table-page-size select {
       width: auto;
-      min-height: 2.15rem;
-      padding: .3rem .5rem;
-      border: 1px solid #d3dfdb;
-      border-radius: 8px;
-      color: #203238;
-      background: #fff;
     }
   `,
 })
@@ -103,8 +99,9 @@ export class TablePageSizeComponent {
       justify-content: space-between;
       gap: .75rem 1rem;
       margin-top: .85rem;
-      color: #617573;
-      font-size: .8rem;
+      color: var(--gris);
+      font-size: .82rem;
+      font-variant-numeric: tabular-nums;
     }
     .table-paginator-buttons {
       display: flex;
@@ -115,22 +112,22 @@ export class TablePageSizeComponent {
       min-width: 2.15rem;
       min-height: 2.15rem;
       padding: .4rem .65rem;
-      border: 1px solid #cfdbd7;
-      border-radius: 8px;
-      color: #315c59;
-      background: #fff;
+      border: 1px solid var(--linea-2);
+      border-radius: var(--radio);
+      color: var(--tinta-2);
+      background: var(--superficie);
       cursor: pointer;
       font-size: .78rem;
       font-weight: 600;
     }
     .table-paginator-buttons button:hover:not(:disabled):not(.active) {
-      border-color: #8fb5ab;
-      background: #eef5f2;
+      border-color: var(--gris-2);
+      background: var(--papel);
     }
     .table-paginator-buttons button.active {
-      border-color: var(--admin-button-fill, #276968);
+      border-color: var(--primario);
       color: #fff;
-      background: var(--admin-button-fill, #276968);
+      background: var(--primario);
     }
     .table-paginator-buttons button:disabled {
       cursor: not-allowed;

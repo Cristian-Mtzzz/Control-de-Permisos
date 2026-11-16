@@ -1,0 +1,203 @@
+/* Barra lateral fija en azul añil; en pantallas angostas pasa a ser una barra superior con las
+   secciones en una fila desplazable. */
+:host {
+    display: block;
+    background: var(--anil);
+}
+
+.sidebar {
+    position: sticky;
+    top: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 1.5rem;
+    height: 100dvh;
+    padding: 1.4rem .9rem 1rem;
+    overflow-y: auto;
+    color: #c9d3e1;
+    background: var(--anil);
+}
+
+.brand {
+    display: grid;
+    gap: .7rem;
+    padding: 0 .45rem 1.3rem;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.brand img {
+    display: block;
+    width: 100%;
+    max-width: 171px;
+    height: auto;
+}
+
+.brand span {
+    color: #fff;
+    font-size: .95rem;
+    font-weight: 650;
+    letter-spacing: -.005em;
+}
+
+.sidebar-nav {
+    display: grid;
+    align-content: start;
+    gap: .2rem;
+    flex: 1;
+}
+
+.sidebar-footer {
+    display: grid;
+    gap: .75rem;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, .08);
+}
+
+.user {
+    display: flex;
+    align-items: flex-start;
+    gap: .65rem;
+    min-width: 0;
+    padding: 0 .45rem;
+}
+
+.avatar {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    color: var(--anil);
+    background: var(--oro);
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.user-text {
+    display: grid;
+    min-width: 0;
+    line-height: 1.3;
+}
+
+/* Nombre y nivel completos: si no caben, siguen en la línea de abajo. */
+.user-text strong,
+.user-text small {
+    overflow-wrap: anywhere;
+}
+
+.user-text strong {
+    color: #fff;
+    font-size: .84rem;
+    font-weight: 600;
+}
+
+.user-text small {
+    color: #93a1b5;
+    font-size: .76rem;
+}
+
+.footer-actions {
+    display: grid;
+    gap: .15rem;
+}
+
+.footer-button {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    width: 100%;
+    padding: .55rem .6rem;
+    border: 0;
+    border-radius: var(--radio);
+    color: #c9d3e1;
+    background: transparent;
+    cursor: pointer;
+    font-size: .86rem;
+    font-weight: 500;
+    text-align: left;
+}
+
+.footer-button:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, .07);
+}
+
+.footer-button:focus-visible {
+    outline-color: var(--oro);
+}
+
+svg {
+    flex: none;
+    width: 1.1rem;
+    height: 1.1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    stroke-width: 1.8;
+}
+
+@media (max-width: 900px) {
+    .sidebar {
+        position: static;
+        flex-direction: row;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: .75rem 1rem;
+        height: auto;
+        padding: .75rem 1rem;
+        overflow: visible;
+    }
+
+    .brand {
+        display: flex;
+        align-items: center;
+        flex: 1;
+        gap: .75rem;
+        padding: 0;
+        border: 0;
+    }
+
+    .brand img {
+        width: 108px;
+    }
+
+    .sidebar-nav {
+        display: flex;
+        order: 3;
+        flex: 1 1 100%;
+        gap: .25rem;
+        overflow-x: auto;
+    }
+
+    .sidebar-footer {
+        display: flex;
+        align-items: center;
+        padding: 0;
+        border: 0;
+    }
+
+    .user {
+        display: none;
+    }
+
+    .footer-actions {
+        display: flex;
+    }
+
+    .footer-button span {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+    }
+}
+
+@media (max-width: 480px) {
+    .brand span {
+        display: none;
+    }
+}

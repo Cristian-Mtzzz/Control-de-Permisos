@@ -14,7 +14,6 @@ const SIN_AREA = -1;
   selector: 'app-permisos-personal',
   imports: [FormsModule, SearchableSelectDirective, PagePipe, TablePageSizeComponent, TablePaginatorComponent],
   templateUrl: './permisos-personal.component.html',
-  styleUrls: ['../shared/panel.css', './permisos.component.css'],
 })
 // Personal de cada área. El jefe ve a su gente, agrega empleados de su departamento que todavía
 // no tienen área y quita a quien sale; los administradores ven a todos los de su alcance y los
@@ -109,6 +108,20 @@ export class PermisosPersonalComponent {
     this.run(
       idArea === 0 ? this.permisosService.quitarArea(empleado.IdEmpleado) : this.permisosService.asignarArea(empleado.IdEmpleado, idArea),
       idArea === 0 ? `${empleado.NombreCompleto} quedó sin área.` : `${empleado.NombreCompleto} pasó al área ${area}.`);
+  }
+
+  // No. de pago editable en la tabla: Enter lo guarda en la base (EMPLEADOS_IHSS.NPAGO) y Esc
+  // deshace lo escrito. Vacío lo borra. Es el que el formulario del permiso carga al elegir al empleado.
+  guardarNoPago(empleado: PermisoEmpleado, campo: HTMLInputElement): void {
+    const valor = campo.value.trim();
+    campo.value = valor;
+    if (valor === (empleado.NoPago ?? '').trim()) return;
+    this.run(this.permisosService.guardarNoPagoEmpleado(empleado.IdEmpleado, valor),
+      valor ? `No. de pago de ${empleado.NombreCompleto} guardado: ${valor}.` : `${empleado.NombreCompleto} quedó sin No. de pago.`);
+  }
+
+  deshacerNoPago(empleado: PermisoEmpleado, campo: HTMLInputElement): void {
+    campo.value = empleado.NoPago ?? '';
   }
 
   // Tras guardar (o fallar) se recarga la lista, para que el selector muestre lo que quedó en la base.

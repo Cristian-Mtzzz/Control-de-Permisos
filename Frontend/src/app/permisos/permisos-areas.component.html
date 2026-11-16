@@ -7,7 +7,6 @@
 <section class="workshop-section">
   <div class="workshop-actions">
     <div>
-      <p class="eyebrow">CATÁLOGO</p>
       <h2>Departamentos</h2>
     </div>
     <div class="workshop-actions-group">
@@ -18,12 +17,12 @@
     <table class="resumen-table">
       <thead>
         <tr>
-          <th>DEPARTAMENTO</th>
-          <th class="num">ÁREAS ACTIVAS</th>
-          <th class="num">EMPLEADOS</th>
-          <th>JORNADA</th>
-          <th>ESTADO</th>
-          <th>ACCIONES</th>
+          <th>Departamento</th>
+          <th class="num">Áreas activas</th>
+          <th class="num">Empleados</th>
+          <th>Jornada</th>
+          <th>Estado</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -37,9 +36,14 @@
             <span class="estado-badge" [class.anulado]="departamento.Estado !== 'ACTIVO'">{{ departamento.Estado }}</span>
           </td>
           <td class="row-actions row-actions-inline">
-            <button type="button" [class]="departamento.Estado === 'ACTIVO' ? 'danger' : 'secondary'"
-              (click)="toggleDepartamento(departamento)" [disabled]="isSaving">
-              {{ departamento.Estado === 'ACTIVO' ? 'Desactivar' : 'Activar' }}
+            @let desactivarDepto = departamento.Estado === 'ACTIVO';
+            <button type="button" [class]="(desactivarDepto ? 'danger' : 'secondary') + ' icon-button'"
+              [attr.data-tip]="desactivarDepto ? 'Desactivar' : 'Activar'" (click)="toggleDepartamento(departamento)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path [attr.d]="desactivarDepto ? 'M5.6 5.6l12.8 12.8' : 'm8 12 3 3 5-6'" />
+              </svg>
+              <span class="sr-only">{{ desactivarDepto ? 'Desactivar' : 'Activar' }}</span>
             </button>
           </td>
         </tr>
@@ -59,7 +63,7 @@
 <section class="workshop-section">
   <div class="workshop-actions">
     <div>
-      <p class="eyebrow">{{ esAdmin ? 'CATÁLOGO' : sesion().NombreDepartamento?.toUpperCase() }}</p>
+      @if (!esAdmin) { <p class="eyebrow">{{ sesion().NombreDepartamento }}</p> }
       <h2>Áreas</h2>
     </div>
     <div class="workshop-actions-group">
@@ -70,12 +74,12 @@
     <table class="resumen-table">
       <thead>
         <tr>
-          <th>ÁREA</th>
-          @if (esAdmin && variosDepartamentos) { <th>DEPARTAMENTO</th> }
-          <th class="num">EMPLEADOS</th>
-          <th class="num">JEFES ACTIVOS</th>
-          <th>ESTADO</th>
-          <th>ACCIONES</th>
+          <th>Área</th>
+          @if (esAdmin && variosDepartamentos) { <th>Departamento</th> }
+          <th class="num">Empleados</th>
+          <th class="num">Jefes activos</th>
+          <th>Estado</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -87,9 +91,19 @@
           <td class="num">{{ area.Jefes }}</td>
           <td><span class="estado-badge" [class.anulado]="area.Estado !== 'ACTIVO'">{{ area.Estado }}</span></td>
           <td class="row-actions row-actions-inline">
-            <button type="button" class="secondary" (click)="openAreaWindow(area)" [disabled]="isSaving">Renombrar</button>
-            <button type="button" [class]="area.Estado === 'ACTIVO' ? 'danger' : 'secondary'" (click)="toggleArea(area)"
-              [disabled]="isSaving">{{ area.Estado === 'ACTIVO' ? 'Desactivar' : 'Activar' }}</button>
+            <button type="button" class="secondary icon-button icon-editar" data-tip="Editar" (click)="openAreaWindow(area)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+              <span class="sr-only">Editar</span>
+            </button>
+            @let desactivarArea = area.Estado === 'ACTIVO';
+            <button type="button" [class]="(desactivarArea ? 'danger' : 'secondary') + ' icon-button'"
+              [attr.data-tip]="desactivarArea ? 'Desactivar' : 'Activar'" (click)="toggleArea(area)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="9" />
+                <path [attr.d]="desactivarArea ? 'M5.6 5.6l12.8 12.8' : 'm8 12 3 3 5-6'" />
+              </svg>
+              <span class="sr-only">{{ desactivarArea ? 'Desactivar' : 'Activar' }}</span>
+            </button>
           </td>
         </tr>
         } @empty {
@@ -104,11 +118,9 @@
 <section class="workshop-section">
   <div class="workshop-actions">
     <div>
-      <p class="eyebrow">USUARIOS</p>
-      <h2>{{ esAdmin ? 'Administradores, jefes y consulta' : 'Jefes de área' }}</h2>
+      <h2>{{ esAdmin ? 'Usuarios del sistema' : 'Usuarios de mi departamento' }}</h2>
     </div>
     <div class="workshop-actions-group">
-      <button type="button" class="secondary" (click)="openAccesoWindow()" [disabled]="isSaving">Dar acceso a usuario de inventario</button>
       <button type="button" (click)="openJefeWindow()" [disabled]="isSaving">Nuevo usuario</button>
     </div>
   </div>
@@ -116,13 +128,13 @@
     <table class="resumen-table jefes-table">
       <thead>
         <tr>
-          <th>NOMBRE</th>
-          <th>USUARIO</th>
-          <th>CUENTA</th>
-          <th>NIVEL</th>
-          <th>ALCANCE</th>
-          <th>ESTADO</th>
-          <th>ACCIONES</th>
+          <th>Nombre</th>
+          <th>Usuario</th>
+          <th>Cuenta</th>
+          <th>Nivel</th>
+          <th>Alcance</th>
+          <th>Estado</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -136,14 +148,23 @@
           <td><span class="estado-badge" [class.anulado]="jefe.Estado !== 'ACTIVO'">{{ jefe.Estado }}</span></td>
           <td class="row-actions row-actions-inline">
             @if (puedeAdministrar(jefe)) {
-            <button type="button" class="secondary" (click)="openJefeWindow(jefe)" [disabled]="isSaving">
-              {{ jefe.SoloPermisos ? 'Editar' : 'Editar acceso' }}
+            <button type="button" class="secondary icon-button icon-editar" data-tip="Editar" (click)="openJefeWindow(jefe)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg>
+              <span class="sr-only">Editar</span>
             </button>
-            @if (jefe.SoloPermisos && jefe.Dominio === 0) {
-            <button type="button" class="secondary" (click)="resetPassword(jefe)" [disabled]="isSaving">Restablecer contraseña</button>
+            @if (!esUsuarioActual(jefe)) {
+            <button type="button" class="secondary icon-button icon-eliminar" data-tip="Eliminar" (click)="openEliminarJefe(jefe)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M10 11v6M14 11v6" />
+              </svg>
+              <span class="sr-only">Eliminar</span>
+            </button>
             }
-            @if (!jefe.SoloPermisos) {
-            <button type="button" class="danger" (click)="quitarAcceso(jefe)" [disabled]="isSaving">Quitar acceso</button>
+            @if (jefe.Dominio === 0) {
+            <button type="button" class="secondary icon-button icon-restablecer" data-tip="Restablecer contraseña" (click)="resetPassword(jefe)" [disabled]="isSaving">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8M3 3v5h5" /></svg>
+              <span class="sr-only">Restablecer contraseña</span>
+            </button>
             }
             } @else {
             <span class="closed">Solo el administrador general</span>
@@ -156,10 +177,6 @@
       </tbody>
     </table>
   </div>
-  <p class="field-hint">
-    Si la persona ya tiene cuenta en el sistema de inventario, usa "Dar acceso a usuario de inventario":
-    entra a este sistema con el mismo usuario y contraseña que usa en el inventario.
-  </p>
 </section>
 
 <!-- Agregar un departamento de DEPARTAMENTO_IHSS al control de permisos. -->
@@ -169,7 +186,6 @@
     (click)="$event.stopPropagation()">
     <div class="modal-heading">
       <div>
-        <p class="eyebrow">NUEVO DEPARTAMENTO</p>
         <h2 id="departamento-form-title">Agregar departamento</h2>
         <p class="modal-subtitle">Sus empleados activos podrán asignarse a sus áreas.</p>
       </div>
@@ -177,12 +193,13 @@
     </div>
     <form (ngSubmit)="agregarDepartamento()">
       @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+      <!-- En orden: la regional habilita sus edificios y el edificio, sus departamentos. -->
       <div class="form-pair">
         <div>
           <label for="departamento-regional">Regional</label>
           <select id="departamento-regional" [(ngModel)]="regionalFiltro" (ngModelChange)="cambiarFiltroDepartamento()"
             name="departamentoRegional">
-            <option [ngValue]="0">Todas las regionales</option>
+            <option [ngValue]="0">Selecciona la regional</option>
             @for (regional of regionales; track regional.Id) {
             <option [ngValue]="regional.Id">{{ regional.Nombre }}</option>
             }
@@ -191,73 +208,26 @@
         <div>
           <label for="departamento-edificio">Edificio</label>
           <select id="departamento-edificio" [(ngModel)]="edificioFiltro" (ngModelChange)="cambiarFiltroDepartamento()"
-            name="departamentoEdificio">
-            <option [ngValue]="0">Todos los edificios</option>
+            name="departamentoEdificio" [disabled]="regionalFiltro === 0">
+            <option [ngValue]="0">{{ regionalFiltro === 0 ? 'Primero elige la regional' : 'Selecciona el edificio' }}</option>
             @for (edificio of edificios; track edificio.Id) {
-            <option [ngValue]="edificio.Id">{{ edificioLabel(edificio) }}</option>
+            <option [ngValue]="edificio.Id">{{ edificio.Nombre }}</option>
             }
           </select>
         </div>
       </div>
 
       <label for="departamento-nuevo">Departamento</label>
-      <select id="departamento-nuevo" [(ngModel)]="nuevoDepartamentoId" name="departamentoNuevo">
-        <option [ngValue]="0">Selecciona el departamento</option>
+      <select id="departamento-nuevo" [(ngModel)]="nuevoDepartamentoId" name="departamentoNuevo" [disabled]="edificioFiltro === 0">
+        <option [ngValue]="0">{{ edificioFiltro === 0 ? 'Primero elige el edificio' : 'Selecciona el departamento' }}</option>
         @for (departamento of departamentosFiltrados; track departamento.IdDepartamento) {
         <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
         }
       </select>
-      <p class="field-hint">{{ departamentosFiltrados.length }} departamento(s) disponibles con estos filtros.</p>
+      @if (edificioFiltro !== 0) {
+      <p class="field-hint">{{ departamentosFiltrados.length }} departamento(s) disponibles en este edificio.</p>
+      }
       <button type="submit" [disabled]="isSaving || nuevoDepartamentoId === 0">{{ isSaving ? 'Guardando...' : 'Agregar' }}</button>
-    </form>
-  </section>
-</div>
-}
-
-<!-- Acceso de una cuenta de inventario: solo nivel, departamento y área. -->
-@if (activeWindow === 'acceso') {
-<div class="modal-backdrop" role="presentation">
-  <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="acceso-form-title"
-    (click)="$event.stopPropagation()">
-    <div class="modal-heading">
-      <div>
-        <p class="eyebrow">CUENTA DE INVENTARIO</p>
-        <h2 id="acceso-form-title">{{ editingJefeId === null ? 'Dar acceso a permisos' : jefeForm.NombrePersona }}</h2>
-        <p class="modal-subtitle">Usa la misma cuenta del inventario. Su usuario, contraseña y rol se siguen administrando allá.</p>
-      </div>
-      <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
-    </div>
-    <form (ngSubmit)="saveAcceso()">
-      @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
-
-      @if (editingJefeId === null && esAdmin) {
-      <label for="acceso-usuario">Cuenta de inventario</label>
-      <select id="acceso-usuario" [(ngModel)]="accesoUsuarioId" name="accesoUsuario">
-        <option [ngValue]="0">Selecciona la cuenta</option>
-        @for (usuario of usuariosInventario; track usuario.IdUsuario) {
-        <option [ngValue]="usuario.IdUsuario">{{ usuario.NombrePersona || usuario.Usuario }} · {{ usuario.Usuario }}</option>
-        }
-      </select>
-      } @else if (editingJefeId === null) {
-      <label for="acceso-busqueda">Usuario de la cuenta de inventario</label>
-      <div class="acceso-busqueda">
-        <input id="acceso-busqueda" [(ngModel)]="accesoBusqueda" name="accesoBusqueda" autocomplete="off"
-          (keydown.enter)="$event.preventDefault(); buscarCuentaInventario()" />
-        <button type="button" class="secondary" (click)="buscarCuentaInventario()">Buscar</button>
-      </div>
-      <p class="field-hint">Escribe el usuario completo con el que la persona entra al inventario.</p>
-      @if (usuariosInventario[0]; as cuenta) {
-      <p class="form-preview">Cuenta: <strong>{{ cuenta.NombrePersona || cuenta.Usuario }}</strong> · {{ cuenta.Usuario }}</p>
-      }
-      } @else {
-      <p class="form-preview">Cuenta: <strong>{{ jefeForm.Usuario }}</strong></p>
-      }
-
-      <ng-container *ngTemplateOutlet="nivelCampos; context: { prefijo: 'acceso' }" />
-
-      <button type="submit" [disabled]="isSaving">
-        {{ isSaving ? 'Guardando...' : (editingJefeId === null ? 'Dar acceso' : 'Guardar cambios') }}
-      </button>
     </form>
   </section>
 </div>
@@ -270,8 +240,7 @@
     (click)="$event.stopPropagation()">
     <div class="modal-heading">
       <div>
-        <p class="eyebrow">{{ editingAreaId === null ? 'NUEVA ÁREA' : 'RENOMBRAR ÁREA' }}</p>
-        <h2 id="area-form-title">{{ editingAreaId === null ? 'Crear área' : 'Renombrar área' }}</h2>
+        <h2 id="area-form-title">{{ editingAreaId === null ? 'Crear área' : 'Editar área' }}</h2>
         @if (!esAdmin) { <p class="modal-subtitle">{{ sesion().NombreDepartamento }}</p> }
       </div>
       <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
@@ -280,7 +249,7 @@
       @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
       @if (esAdmin && editingAreaId === null) {
       <label for="area-departamento">Departamento</label>
-      <select nativeSelect id="area-departamento" [(ngModel)]="areaDepartamentoId" name="areaDepartamento">
+      <select sinBusqueda id="area-departamento" [(ngModel)]="areaDepartamentoId" name="areaDepartamento">
         <option [ngValue]="null">Selecciona el departamento</option>
         @for (departamento of departamentosActivos; track departamento.IdDepartamento) {
         <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
@@ -290,20 +259,47 @@
       <label for="area-nombre">Nombre del área</label>
       <input id="area-nombre" type="text" appMayusculas [(ngModel)]="areaNombre" name="areaNombre" maxlength="100"
         placeholder="Ejemplo: DESARROLLO" required />
-      <button type="submit" [disabled]="isSaving">{{ isSaving ? 'Guardando...' : 'Guardar' }}</button>
+      <button type="submit" [disabled]="isSaving || !areaCompleta">{{ isSaving ? 'Guardando...' : 'Guardar' }}</button>
     </form>
   </section>
 </div>
 }
 
-<!-- Alta o edición de un usuario propio de permisos: cuenta, nivel y su departamento o área. -->
+<!-- Confirmación antes de eliminar un usuario. -->
+@if (activeWindow === 'eliminar' && jefeAEliminar) {
+<div class="modal-backdrop" role="presentation">
+  <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="eliminar-jefe-title"
+    (click)="$event.stopPropagation()">
+    <div class="modal-heading">
+      <div>
+        <h2 id="eliminar-jefe-title">Eliminar usuario</h2>
+        <p class="modal-subtitle">{{ jefeAEliminar.NombrePersona }} · {{ jefeAEliminar.Usuario }}</p>
+      </div>
+      <button type="button" class="modal-close" aria-label="Cerrar ventana" (click)="closeWindow()">×</button>
+    </div>
+    <form (ngSubmit)="confirmEliminarJefe()">
+      @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
+      <p class="anular-text">
+        El usuario deja de poder entrar al sistema. Los permisos que registró se conservan. Esta acción no se puede deshacer;
+        si solo quieres quitarle el acceso por un tiempo, edítalo y déjalo inactivo.
+      </p>
+      <div class="anular-actions">
+        <button type="button" class="secondary" (click)="closeWindow()">Cancelar</button>
+        <button type="submit" class="danger-solid" [disabled]="isSaving">{{ isSaving ? 'Eliminando...' : 'Eliminar usuario' }}</button>
+      </div>
+    </form>
+  </section>
+</div>
+}
+
+<!-- Alta o edición de un usuario: cuenta, nivel y su departamento o área. -->
 @if (activeWindow === 'jefe') {
 <div class="modal-backdrop" role="presentation">
   <section class="workshop-modal" role="dialog" aria-modal="true" aria-labelledby="jefe-form-title"
     (click)="$event.stopPropagation()">
     <div class="modal-heading">
       <div>
-        <p class="eyebrow">{{ editingJefeId === null ? 'NUEVO USUARIO' : 'EDITAR USUARIO' }}</p>
+        @if (editingJefeId !== null) { <p class="eyebrow">Editar usuario</p> }
         <h2 id="jefe-form-title">{{ editingJefeId === null ? 'Crear usuario de permisos' : jefeForm.NombrePersona }}</h2>
         <p class="modal-subtitle">Cada usuario solo ve los permisos de su nivel: su área, su departamento o todo.</p>
       </div>
@@ -312,32 +308,84 @@
     <form (ngSubmit)="saveJefe()">
       @if (errorMessage) { <p class="feedback error" role="alert">{{ errorMessage }}</p> }
 
-      <!-- El nombre del usuario se toma del empleado elegido; no se escribe a mano. -->
-      @if (editingJefeId === null) {
       <div class="form-pair">
         <div>
-          <label for="jefe-depto-filtro">Departamento del empleado</label>
-          <select id="jefe-depto-filtro" [(ngModel)]="jefeDeptoFiltro" (ngModelChange)="cambiarFiltroEmpleado()"
-            name="jefeDeptoFiltro">
-            <option [ngValue]="0">Todos los departamentos</option>
-            @for (departamento of departamentosActivos; track departamento.IdDepartamento) {
-            <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
-            }
+          <label for="jefe-cuenta">Tipo de autenticación</label>
+          <select sinBusqueda id="jefe-cuenta" [(ngModel)]="jefeForm.Dominio" name="jefeCuenta">
+            <option [ngValue]="1">Usuario de dominio</option>
+            <option [ngValue]="0">Usuario local</option>
           </select>
         </div>
         <div>
-          <label for="jefe-area-filtro">Área del empleado</label>
-          <select id="jefe-area-filtro" [(ngModel)]="jefeAreaFiltro" (ngModelChange)="cambiarFiltroEmpleado()"
-            name="jefeAreaFiltro">
-            <option [ngValue]="0">Todas las áreas</option>
-            <option [ngValue]="sinArea">Sin área</option>
-            @for (area of areasFiltroEmpleado; track area.IdArea) {
-            <option [ngValue]="area.IdArea">{{ jefeDeptoFiltro ? area.Nombre : areaLabel(area) }}</option>
-            }
+          <label for="jefe-dominio">Dominio</label>
+          <!-- Solo lo usa la cuenta de dominio; en la local queda bloqueado. -->
+          <select sinBusqueda id="jefe-dominio" [(ngModel)]="jefeForm.DominioP" name="jefeDominio"
+            [disabled]="jefeForm.Dominio !== 1">
+            @for (dominio of dominios; track dominio) { <option [value]="dominio">{{ dominio }}</option> }
           </select>
         </div>
       </div>
 
+      <!-- El jefe de departamento nombra a los de su departamento: jefes de área y su secretaría. -->
+      @if (niveles.length > 1) {
+      <label for="jefe-nivel">Nivel de acceso</label>
+      <select sinBusqueda id="jefe-nivel" [(ngModel)]="jefeForm.Nivel" name="jefeNivel">
+        @for (nivel of niveles; track nivel.value) { <option [value]="nivel.value">{{ nivel.label }}</option> }
+      </select>
+      <p class="field-hint">
+        @switch (jefeForm.Nivel) {
+        @case ('ADMIN') {
+        Ve todos los departamentos y administra departamentos, áreas y usuarios.
+        @if (editingJefeId === null) { El departamento y el área solo sirven para buscar al empleado. }
+        }
+        @case ('ADMIN_DEPTO') {
+        Ve su departamento y administra sus áreas, su personal y sus jefes.
+        @if (editingJefeId === null) { El área solo sirve para buscar al empleado. }
+        }
+        @case ('SECRETARIA') {
+        Ve todas las áreas de su departamento y saca sus reportes y memorandos; no registra permisos.
+        @if (editingJefeId === null) { El área solo sirve para buscar al empleado. }
+        }
+        @case ('USUARIO') {
+        Registra y ve solo sus propios permisos y vacaciones, y los imprime. No los modifica después
+        ni genera memorandos o reportes.
+        @if (editingJefeId === null) { La cuenta queda atada al empleado que elijas abajo. }
+        }
+        @default { Ve y registra los permisos de su área. }
+        }
+      </p>
+      }
+
+      <!-- Departamento (de los habilitados en el sistema) y área: buscan al empleado y son lo que
+        el usuario va a ver: el jefe de área, su área; el jefe de departamento, su departamento. -->
+      @if (pideDepartamento) {
+      <label for="jefe-departamento">{{ jefeForm.Nivel === 'ADMIN_DEPTO' ? 'Departamento que administra' : 'Departamento' }}</label>
+      <select sinBusqueda id="jefe-departamento" [(ngModel)]="jefeForm.IdDepartamento"
+        (ngModelChange)="cambiarDepartamentoJefe()" name="jefeDepartamento">
+        <option [ngValue]="null">{{ jefeForm.Nivel === 'ADMIN' ? 'Todos los departamentos' : 'Selecciona el departamento' }}</option>
+        @for (departamento of departamentosActivos; track departamento.IdDepartamento) {
+        <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
+        }
+      </select>
+      }
+
+      @if (pideArea) {
+      <label for="jefe-area">Área</label>
+      <select sinBusqueda id="jefe-area" [(ngModel)]="jefeForm.IdArea" (ngModelChange)="cambiarAreaJefe()" name="jefeArea"
+        [disabled]="!jefeForm.IdDepartamento">
+        <option [ngValue]="null">
+          {{ !jefeForm.IdDepartamento ? 'Primero elige el departamento' : jefeForm.Nivel === 'JEFE' ? 'Selecciona el área' : 'Todas las áreas' }}
+        </option>
+        @for (area of areasJefe; track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
+      </select>
+      @if (jefeForm.Nivel === 'JEFE' && jefeForm.IdDepartamento && areasJefe.length === 0) {
+      <p class="field-hint">{{ departamentoNombre(jefeForm.IdDepartamento) }} todavía no tiene áreas. Créala primero en la sección Áreas.</p>
+      }
+      }
+
+      <!-- El nombre del usuario se toma del empleado elegido; no se escribe a mano. Con un área se
+        listan su personal y el del departamento que todavía no tiene área. -->
+      @if (editingJefeId === null) {
       <label for="jefe-empleado">Empleado</label>
       <select id="jefe-empleado" [ngModel]="jefeEmpleadoId" (ngModelChange)="selectJefeEmpleado($event)" name="jefeEmpleado">
         <option [ngValue]="0">Selecciona al empleado</option>
@@ -356,84 +404,20 @@
         } @else {
         Entra con la contraseña 1234 y se le pide cambiarla la primera vez.
         }
-        Si la persona ya tiene cuenta de inventario, no crees otra: usa "Dar acceso a usuario de inventario".
       </p>
-
-      <div class="form-pair">
-        <div>
-          <label for="jefe-cuenta">Tipo de autenticación</label>
-          <select nativeSelect id="jefe-cuenta" [(ngModel)]="jefeForm.Dominio" name="jefeCuenta">
-            <option [ngValue]="1">Usuario de dominio</option>
-            <option [ngValue]="0">Usuario local</option>
-          </select>
-        </div>
-        <div>
-          <label for="jefe-dominio">Dominio</label>
-          <select nativeSelect id="jefe-dominio" [(ngModel)]="jefeForm.DominioP" name="jefeDominio">
-            @for (dominio of dominios; track dominio) { <option [value]="dominio">{{ dominio }}</option> }
-          </select>
-        </div>
-      </div>
-
-      <ng-container *ngTemplateOutlet="nivelCampos; context: { prefijo: 'jefe' }" />
 
       @if (editingJefeId !== null) {
       <label for="jefe-estado">Estado</label>
-      <select nativeSelect id="jefe-estado" [(ngModel)]="jefeForm.Estado" name="jefeEstado">
+      <select sinBusqueda id="jefe-estado" [(ngModel)]="jefeForm.Estado" name="jefeEstado">
         <option value="ACTIVO">Activo</option>
         <option value="INACTIVO">Inactivo</option>
       </select>
       }
 
-      <button type="submit" [disabled]="isSaving">
+      <button type="submit" [disabled]="isSaving || !jefeCompleto">
         {{ isSaving ? 'Guardando...' : (editingJefeId === null ? 'Crear usuario' : 'Guardar cambios') }}
       </button>
     </form>
   </section>
 </div>
 }
-
-<!-- Nivel de acceso y, según el nivel, el departamento que administra o el área del jefe.
-  El administrador de departamento solo nombra jefes de sus áreas. -->
-<ng-template #nivelCampos let-prefijo="prefijo">
-  @if (esAdmin) {
-  <label [for]="prefijo + '-nivel'">Nivel de acceso</label>
-  <select nativeSelect [id]="prefijo + '-nivel'" [(ngModel)]="jefeForm.Nivel" [name]="prefijo + 'Nivel'">
-    @for (nivel of niveles; track nivel.value) { <option [value]="nivel.value">{{ nivel.label }}</option> }
-  </select>
-  <p class="field-hint">
-    @switch (jefeForm.Nivel) {
-    @case ('ADMIN') { Ve todos los departamentos y administra departamentos, áreas y usuarios. }
-    @case ('ADMIN_DEPTO') { Ve su departamento y administra sus áreas, su personal y sus jefes. }
-    @case ('CONSULTA') { Ve y exporta los permisos de todos los departamentos, sin registrar ni modificar. }
-    @default { Ve y registra los permisos de su área. }
-    }
-  </p>
-  }
-
-  <!-- El jefe se asigna a un departamento y a una de sus áreas: ve al personal de ese departamento. -->
-  @if (jefeForm.Nivel === 'ADMIN_DEPTO' || jefeForm.Nivel === 'JEFE') {
-  <label [for]="prefijo + '-departamento'">{{ jefeForm.Nivel === 'ADMIN_DEPTO' ? 'Departamento que administra' : 'Departamento' }}</label>
-  <select nativeSelect [id]="prefijo + '-departamento'" [(ngModel)]="jefeForm.IdDepartamento"
-    (ngModelChange)="cambiarDepartamentoJefe()" [name]="prefijo + 'Departamento'">
-    <option [ngValue]="null">Selecciona el departamento</option>
-    @for (departamento of departamentosActivos; track departamento.IdDepartamento) {
-    <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
-    }
-  </select>
-  }
-
-  @if (jefeForm.Nivel === 'JEFE') {
-  <label [for]="prefijo + '-area'">Área</label>
-  <select nativeSelect [id]="prefijo + '-area'" [(ngModel)]="jefeForm.IdArea" [name]="prefijo + 'Area'"
-    [disabled]="!jefeForm.IdDepartamento">
-    <option [ngValue]="null">{{ jefeForm.IdDepartamento ? 'Selecciona el área' : 'Primero elige el departamento' }}</option>
-    @for (area of areasJefe; track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
-  </select>
-  @if (jefeForm.IdDepartamento && areasJefe.length === 0) {
-  <p class="field-hint">{{ departamentoNombre(jefeForm.IdDepartamento) }} todavía no tiene áreas. Créala primero en la sección Áreas.</p>
-  }
-  }
-
-  @if (avisoDepartamento; as aviso) { <p class="field-hint">{{ aviso }}</p> }
-</ng-template>

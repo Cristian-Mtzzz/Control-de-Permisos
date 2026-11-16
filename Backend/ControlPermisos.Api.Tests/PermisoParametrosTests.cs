@@ -12,6 +12,7 @@ public sealed class PermisoParametrosTests
         new(null, "HORA_FIN_JORNADA", "16:00"),
         new(null, "MAX_DIAS_POR_ANIO", "15"),
         new(null, "MAX_HORAS_POR_PERMISO", "1.5"),
+        new(null, "MAX_DIAS_POR_MES", "2"),
         new(146, "HORA_INICIO_JORNADA", "07:00"),
         new(146, "HORA_FIN_JORNADA", "15:00"),
         new(146, "MAX_DIAS_POR_ANIO", null),
@@ -25,6 +26,7 @@ public sealed class PermisoParametrosTests
         Assert.Equal(new TimeOnly(16, 0), parametros.FinJornada);
         Assert.Equal(15m, parametros.MaxDiasPorAnio);
         Assert.Equal(1.5m, parametros.MaxHorasPorPermiso);
+        Assert.Equal(2m, parametros.MaxDiasPorMes);
         Assert.Null(parametros.MaxDiasPorPermiso);
     }
 

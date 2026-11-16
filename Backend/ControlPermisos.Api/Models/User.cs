@@ -1,6 +1,6 @@
 namespace ControlPermisos.Api.Models;
 
-// Datos de USUARIOS que se usan al iniciar sesión y para los claims del JWT.
+// Datos de USUARIOS_PERMISOS que se usan al iniciar sesión y para los claims del JWT.
 public sealed class User
 {
     public int UserId { get; set; }

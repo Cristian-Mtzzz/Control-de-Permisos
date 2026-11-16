@@ -6,27 +6,21 @@ using ControlPermisos.Api.Models;
 
 namespace ControlPermisos.Api.Services;
 
-// Departamentos, áreas (jefaturas) y usuarios del Control de permisos. El acceso no depende del
-// rol sino del perfil, con un solo nivel por usuario:
-//   USUARIOS.PERMISO_ADMIN = 1    -> administrador general (todos los departamentos).
-//   USUARIOS.ID_DEPTO_PERMISO     -> administrador de ese departamento.
-//   USUARIOS.ID_AREA_PERMISO      -> jefe de esa área.
-//   USUARIOS.PERMISO_CONSULTA = 1 -> consulta: ve y exporta todo, no modifica nada.
-// Así una cuenta de inventario también puede tener acceso; las cuentas con rol 'Permisos' son
-// las que solo usan este sistema.
+// Departamentos, áreas (jefaturas) y usuarios del Control de permisos. Los usuarios son los de
+// USUARIOS_PERMISOS (propios de este sistema, aparte de USUARIOS del inventario), con un solo
+// nivel por usuario:
+//   PERMISO_ADMIN = 1    -> administrador general (todos los departamentos).
+//   ID_DEPTO_PERMISO     -> jefe (administrador) de ese departamento, o su secretaría cuando
+//                           PERMISO_SECRETARIA = 1 (ve y exporta ese departamento, no registra).
+//   ID_AREA_PERMISO      -> jefe de esa área.
 public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepository(dbContext), IPermisoAreaService
 {
     // Contraseña con la que se crean o restablecen los usuarios locales; se pide cambiarla al entrar.
     private const string InitialPassword = "1234";
-    // Usuarios con acceso a permisos (o cuentas propias del sistema aunque hoy no tengan nivel).
-    private const string ConAccesoSql = """
-        (u.ROL = 'Permisos' OR u.PERMISO_ADMIN = 1 OR u.PERMISO_CONSULTA = 1
-         OR u.ID_DEPTO_PERMISO IS NOT NULL OR u.ID_AREA_PERMISO IS NOT NULL)
-        """;
     // Cuenta que puede iniciar sesión hoy: activa y sin vencer (la misma condición del login).
     // Las vencidas no cuentan como jefes o administradores activos.
     private const string VigenteSql = """
-        UPPER(u.ESTADO) = 'ACTIVO' AND (u.FECHA_EXPIRACION IS NULL OR u.FECHA_EXPIRACION >= TRUNC(SYSDATE))
+        u.ESTADO = 'ACTIVO' AND (u.FECHA_EXPIRACION IS NULL OR u.FECHA_EXPIRACION >= TRUNC(SYSDATE))
         """;
 
     // Se lee en cada solicitud para que un cambio de nivel, área o departamento aplique de
@@ -35,28 +29,39 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
     // siga vigente.
     public async Task<PermisoAlcance> GetAlcance(int idUsuario, CancellationToken cancellationToken)
     {
-        var rows = await ReadList("""
-            SELECT u.PERMISO_ADMIN, u.PERMISO_CONSULTA,
+        var rows = await ReadList($"""
+            SELECT u.PERMISO_ADMIN, u.PERMISO_SECRETARIA,
                    u.ID_DEPTO_PERMISO, dd.ESTADO AS ESTADO_DEPTO,
                    u.ID_AREA_PERMISO, a.ESTADO AS ESTADO_AREA,
-                   a.DEPARTAMENTO_IHSS_ID AS DEPTO_AREA, da.ESTADO AS ESTADO_DEPTO_AREA
-            FROM USUARIOS u
+                   a.DEPARTAMENTO_IHSS_ID AS DEPTO_AREA, da.ESTADO AS ESTADO_DEPTO_AREA,
+                   u.ID_EMPLEADO_PERMISO, emp.DEPARTAMENTO_IHSS_ID AS DEPTO_EMPLEADO,
+                   emp.ESTADO AS ESTADO_EMPLEADO, de.ESTADO AS ESTADO_DEPTO_EMPLEADO, ae.ID_AREA AS AREA_EMPLEADO
+            FROM USUARIOS_PERMISOS u
             LEFT JOIN PERMISO_DEPARTAMENTO dd ON dd.DEPARTAMENTO_IHSS_ID = u.ID_DEPTO_PERMISO
             LEFT JOIN PERMISO_AREA a ON a.ID_AREA = u.ID_AREA_PERMISO
             LEFT JOIN PERMISO_DEPARTAMENTO da ON da.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID
-            WHERE u.ID_USUARIO = :idUsuario
-              AND UPPER(u.ESTADO) = 'ACTIVO'
-              AND (u.FECHA_EXPIRACION IS NULL OR u.FECHA_EXPIRACION >= TRUNC(SYSDATE))
+            LEFT JOIN EMPLEADOS_IHSS emp ON emp.EMPLEADOS_IHSS_ID = u.ID_EMPLEADO_PERMISO
+            LEFT JOIN PERMISO_DEPARTAMENTO de ON de.DEPARTAMENTO_IHSS_ID = emp.DEPARTAMENTO_IHSS_ID
+            LEFT JOIN (SELECT ae.ID_EMPLEADO, ae.ID_AREA
+                       FROM PERMISO_AREA_EMPLEADO ae
+                       JOIN PERMISO_AREA aa ON aa.ID_AREA = ae.ID_AREA AND aa.ESTADO = 'ACTIVO') ae
+                   ON ae.ID_EMPLEADO = u.ID_EMPLEADO_PERMISO
+            WHERE u.ID_USUARIO = :idUsuario AND {VigenteSql}
             """, reader => new
             {
                 EsAdmin = ReadNullableInt(reader, "PERMISO_ADMIN") == 1,
-                EsConsulta = ReadNullableInt(reader, "PERMISO_CONSULTA") == 1,
+                EsSecretaria = ReadNullableInt(reader, "PERMISO_SECRETARIA") == 1,
                 IdDepartamento = ReadNullableInt(reader, "ID_DEPTO_PERMISO"),
                 EstadoDepartamento = ReadNullableString(reader, "ESTADO_DEPTO"),
                 IdArea = ReadNullableInt(reader, "ID_AREA_PERMISO"),
                 EstadoArea = ReadNullableString(reader, "ESTADO_AREA"),
                 DepartamentoArea = ReadNullableInt(reader, "DEPTO_AREA"),
                 EstadoDepartamentoArea = ReadNullableString(reader, "ESTADO_DEPTO_AREA"),
+                IdEmpleado = ReadNullableInt(reader, "ID_EMPLEADO_PERMISO"),
+                DepartamentoEmpleado = ReadNullableInt(reader, "DEPTO_EMPLEADO"),
+                EstadoEmpleado = ReadNullableInt(reader, "ESTADO_EMPLEADO"),
+                EstadoDepartamentoEmpleado = ReadNullableString(reader, "ESTADO_DEPTO_EMPLEADO"),
+                AreaEmpleado = ReadNullableInt(reader, "AREA_EMPLEADO"),
             },
             cancellationToken, ("idUsuario", idUsuario));
 
@@ -67,15 +72,23 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
         }
         var perfil = rows[0];
         if (perfil.EsAdmin) return new PermisoAlcance(idUsuario, PermisoValores.NivelAdmin, null, null);
-        if (perfil.EsConsulta) return new PermisoAlcance(idUsuario, PermisoValores.NivelConsulta, null, null);
         if (perfil.IdDepartamento is { } idDepartamento && perfil.EstadoDepartamento == PermisoValores.Activo)
         {
-            return new PermisoAlcance(idUsuario, PermisoValores.NivelAdminDepartamento, idDepartamento, null);
+            var nivel = perfil.EsSecretaria ? PermisoValores.NivelSecretaria : PermisoValores.NivelAdminDepartamento;
+            return new PermisoAlcance(idUsuario, nivel, idDepartamento, null);
         }
         if (perfil.IdArea is { } idArea && perfil.EstadoArea == PermisoValores.Activo
             && perfil.EstadoDepartamentoArea == PermisoValores.Activo)
         {
             return new PermisoAlcance(idUsuario, PermisoValores.NivelJefe, perfil.DepartamentoArea, idArea);
+        }
+        // Empleado: ve y registra solo lo suyo. Necesita estar activo y su departamento habilitado;
+        // su área (la de los permisos que registra) puede faltar todavía.
+        if (perfil.IdEmpleado is { } idEmpleado && perfil.EstadoEmpleado == 1
+            && perfil.EstadoDepartamentoEmpleado == PermisoValores.Activo)
+        {
+            return new PermisoAlcance(
+                idUsuario, PermisoValores.NivelUsuario, perfil.DepartamentoEmpleado, perfil.AreaEmpleado, idEmpleado);
         }
 
         throw new UnauthorizedAccessException(
@@ -153,7 +166,7 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                         JOIN EMPLEADOS_IHSS e ON e.EMPLEADOS_IHSS_ID = ae.ID_EMPLEADO
                         WHERE ae.ID_AREA = a.ID_AREA AND e.ESTADO = 1
                           AND e.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID) AS EMPLEADOS,
-                       (SELECT COUNT(*) FROM USUARIOS u
+                       (SELECT COUNT(*) FROM USUARIOS_PERMISOS u
                         WHERE u.ID_AREA_PERMISO = a.ID_AREA AND {VigenteSql}) AS JEFES
                 FROM PERMISO_AREA a
                 {(alcance.FiltroArea("a.") is { } filtro ? $"WHERE {filtro}" : string.Empty)}
@@ -174,7 +187,8 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                 alcance.IdArea,
                 areas.FirstOrDefault(area => area.IdArea == alcance.IdArea)?.Nombre,
                 departamentos,
-                areas);
+                areas,
+                alcance.IdEmpleado);
         }
         finally
         {
@@ -237,7 +251,7 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                     SELECT COUNT(*) FROM PERMISO_AREA WHERE DEPARTAMENTO_IHSS_ID = :idDepartamento AND ESTADO = 'ACTIVO'
                     """, cancellationToken, ("idDepartamento", idDepartamento));
                 var administradores = await GetScalar<int>(connection, transaction, $"""
-                    SELECT COUNT(*) FROM USUARIOS u WHERE u.ID_DEPTO_PERMISO = :idDepartamento AND {VigenteSql}
+                    SELECT COUNT(*) FROM USUARIOS_PERMISOS u WHERE u.ID_DEPTO_PERMISO = :idDepartamento AND {VigenteSql}
                     """, cancellationToken, ("idDepartamento", idDepartamento));
                 if (areas > 0 || administradores > 0)
                 {
@@ -303,7 +317,7 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                     WHERE ae.ID_AREA = :idArea AND e.ESTADO = 1 AND e.DEPARTAMENTO_IHSS_ID = a.DEPARTAMENTO_IHSS_ID
                     """, cancellationToken, ("idArea", idArea));
                 var jefes = await GetScalar<int>(connection, transaction, $"""
-                    SELECT COUNT(*) FROM USUARIOS u WHERE u.ID_AREA_PERMISO = :idArea AND {VigenteSql}
+                    SELECT COUNT(*) FROM USUARIOS_PERMISOS u WHERE u.ID_AREA_PERMISO = :idArea AND {VigenteSql}
                     """, cancellationToken, ("idArea", idArea));
                 if (empleados > 0 || jefes > 0)
                 {
@@ -318,22 +332,40 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                 """, cancellationToken, ("nombre", area.Nombre.Trim()), ("estado", estado), ("idArea", idArea)) == 1;
         }, cancellationToken);
 
+    // ---- Logos de los formatos -----------------------------------------------------------
+
+    public Task<IReadOnlyList<PermisoLogoDto>> GetLogos(CancellationToken cancellationToken) =>
+        ReadList("""
+            SELECT CLAVE, TIPO_MIME, IMAGEN
+            FROM PERMISO_LOGO
+            ORDER BY CLAVE
+            """, reader => new PermisoLogoDto(
+                ReadString(reader, "CLAVE").Trim(),
+                ReadString(reader, "TIPO_MIME").Trim(),
+                Convert.ToBase64String(ReadBytes(reader, "IMAGEN"))),
+            cancellationToken);
+
     // ---- Usuarios ------------------------------------------------------------------------
 
     // El general ve a todos; el de departamento, a los jefes de sus áreas y a los administradores
     // de su departamento.
     public Task<IReadOnlyList<PermisoJefeDto>> GetJefes(PermisoAlcance alcance, CancellationToken cancellationToken) =>
         ReadList($"""
-            SELECT u.ID_USUARIO, u.USUARIO, u.NOMBRE_PERSONA, u.ROL, u.PERMISO_ADMIN, u.PERMISO_CONSULTA,
+            SELECT u.ID_USUARIO, u.USUARIO, u.NOMBRE_PERSONA, u.PERMISO_ADMIN, u.PERMISO_SECRETARIA,
                    u.ID_DEPTO_PERMISO, u.ID_AREA_PERMISO, a.NOMBRE AS NOMBRE_AREA,
-                   NVL(u.ID_DEPTO_PERMISO, a.DEPARTAMENTO_IHSS_ID) AS ID_DEPARTAMENTO,
+                   NVL(NVL(u.ID_DEPTO_PERMISO, a.DEPARTAMENTO_IHSS_ID), emp.DEPARTAMENTO_IHSS_ID) AS ID_DEPARTAMENTO,
                    d.DEPARTAMENTO_IHSS_DESC AS NOMBRE_DEPARTAMENTO,
+                   u.ID_EMPLEADO_PERMISO, emp.NOMBRE_EMPLEADO,
                    u.ESTADO, u.DOMINIO, u.DOMINIOP
-            FROM USUARIOS u
+            FROM USUARIOS_PERMISOS u
             LEFT JOIN PERMISO_AREA a ON a.ID_AREA = u.ID_AREA_PERMISO
-            LEFT JOIN DEPARTAMENTO_IHSS d ON d.DEPARTAMENTO_IHSS_ID = NVL(u.ID_DEPTO_PERMISO, a.DEPARTAMENTO_IHSS_ID)
-            WHERE {ConAccesoSql}
-            {(alcance.EsAdmin ? string.Empty : "AND (a.DEPARTAMENTO_IHSS_ID = :alcanceDepto OR u.ID_DEPTO_PERMISO = :alcanceDepto)")}
+            LEFT JOIN EMPLEADOS_IHSS emp ON emp.EMPLEADOS_IHSS_ID = u.ID_EMPLEADO_PERMISO
+            LEFT JOIN DEPARTAMENTO_IHSS d
+                   ON d.DEPARTAMENTO_IHSS_ID = NVL(NVL(u.ID_DEPTO_PERMISO, a.DEPARTAMENTO_IHSS_ID), emp.DEPARTAMENTO_IHSS_ID)
+            {(alcance.EsAdmin ? string.Empty : """
+                WHERE a.DEPARTAMENTO_IHSS_ID = :alcanceDepto OR u.ID_DEPTO_PERMISO = :alcanceDepto
+                   OR emp.DEPARTAMENTO_IHSS_ID = :alcanceDepto
+                """)}
             ORDER BY UPPER(u.NOMBRE_PERSONA), u.USUARIO
             """, reader => new PermisoJefeDto(
                 ReadInt(reader, "ID_USUARIO"),
@@ -347,25 +379,26 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                 ReadString(reader, "ESTADO").Trim().ToUpperInvariant(),
                 ReadNullableInt(reader, "DOMINIO") ?? 0,
                 ReadString(reader, "DOMINIOP").Trim(),
-                EsSoloPermisos(ReadString(reader, "ROL"))),
+                ReadNullableInt(reader, "ID_EMPLEADO_PERMISO"),
+                ReadNullableString(reader, "NOMBRE_EMPLEADO")?.Trim()),
             cancellationToken, alcance.EsAdmin ? [] : [("alcanceDepto", alcance.IdDepartamento)]);
 
-    // Crea una cuenta que solo usa el control de permisos (rol 'Permisos').
+    // Crea un usuario del control de permisos.
     public Task CreateJefe(PermisoAlcance alcance, SavePermisoJefeDto jefe, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
             await ValidarUsuario(connection, transaction, jefe.Usuario, null, cancellationToken);
-            var perfil = await ValidarNivel(connection, transaction, alcance, jefe, null, cancellationToken);
-            var idUsuario = await NextId(connection, transaction, "USUARIOS", "ID_USUARIO", cancellationToken);
+            var perfil = await ValidarNivel(connection, transaction, alcance, jefe, cancellationToken);
+            var idUsuario = await NextId(connection, transaction, "USUARIOS_PERMISOS", "ID_USUARIO", cancellationToken);
             await Execute(connection, transaction, """
-                INSERT INTO USUARIOS
+                INSERT INTO USUARIOS_PERMISOS
                     (ID_USUARIO, USUARIO, NOMBRE_PERSONA, FECHA_EXPIRACION, ESTADO,
-                     PASSWORD_HASH, ROL, DOMINIOP, DOMINIO, CLAVE_SEGURA,
-                     PERMISO_ADMIN, PERMISO_CONSULTA, ID_DEPTO_PERMISO, ID_AREA_PERMISO)
+                     PASSWORD_HASH, DOMINIOP, DOMINIO, CLAVE_SEGURA,
+                     PERMISO_ADMIN, ID_DEPTO_PERMISO, ID_AREA_PERMISO, PERMISO_SECRETARIA, ID_EMPLEADO_PERMISO)
                 VALUES
                     (:idUsuario, :usuario, :nombrePersona, NULL, 'ACTIVO',
-                     :passwordHash, 'Permisos', :dominioP, :dominio, '0',
-                     :permisoAdmin, :permisoConsulta, :idDepto, :idArea)
+                     :passwordHash, :dominioP, :dominio, '0',
+                     :permisoAdmin, :idDepto, :idArea, :secretaria, :idEmpleadoPerfil)
                 """, cancellationToken,
                 [("idUsuario", idUsuario), ("usuario", jefe.Usuario.Trim()),
                  ("nombrePersona", jefe.NombrePersona.Trim()),
@@ -374,10 +407,7 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                  .. perfil.Parametros()]);
         }, cancellationToken);
 
-    // En una cuenta propia de permisos se edita todo. En una cuenta de inventario solo el nivel,
-    // el departamento y el área: su usuario, contraseña y estado se administran en inventario
-    // (así también se le da acceso a una cuenta de inventario que no lo tenía). Nadie puede
-    // cambiar su propio nivel ni desactivarse.
+    // Cuenta, estado y nivel del usuario. Nadie puede cambiar su propio nivel ni desactivarse.
     public Task<bool> UpdateJefe(PermisoAlcance alcance, int idUsuario, SavePermisoJefeDto jefe, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
@@ -389,29 +419,15 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
 
             var actual = await LeerUsuario(connection, transaction, idUsuario, cancellationToken);
             if (actual is null) return false;
-            // Un usuario sin nivel (nuevo acceso de una cuenta de inventario) lo puede tomar cualquier
-            // administrador; uno con nivel, solo quien lo administra.
+            // Un usuario sin nivel lo puede tomar cualquier administrador; uno con nivel, solo quien lo administra.
             if (actual.Nivel is not null && !Administra(alcance, actual)) return false;
-            var perfil = await ValidarNivel(connection, transaction, alcance, jefe, actual.Nivel, cancellationToken);
-
-            if (!actual.SoloPermisos)
-            {
-                return await Execute(connection, transaction, """
-                    UPDATE USUARIOS
-                    SET PERMISO_ADMIN = :permisoAdmin,
-                        PERMISO_CONSULTA = :permisoConsulta,
-                        ID_DEPTO_PERMISO = :idDepto,
-                        ID_AREA_PERMISO = :idArea
-                    WHERE ID_USUARIO = :idUsuario
-                    """, cancellationToken, [.. perfil.Parametros(), ("idUsuario", idUsuario)]) == 1;
-            }
-
+            var perfil = await ValidarNivel(connection, transaction, alcance, jefe, cancellationToken, idUsuario);
             await ValidarUsuario(connection, transaction, jefe.Usuario, idUsuario, cancellationToken);
             // Una cuenta de dominio que pasa a local no conserva la contraseña guardada (puede ser la
             // inicial sin obligación de cambiarla): queda con 1234 y se le pide cambiarla al entrar.
             // En el SET de Oracle, DOMINIO del CASE es el valor anterior a esta actualización.
             return await Execute(connection, transaction, """
-                UPDATE USUARIOS
+                UPDATE USUARIOS_PERMISOS
                 SET USUARIO = :usuario,
                     NOMBRE_PERSONA = :nombrePersona,
                     ESTADO = :estado,
@@ -420,11 +436,11 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                     CLAVE_SEGURA = CASE WHEN DOMINIO = 1 AND :dominio = 0 THEN '0' ELSE CLAVE_SEGURA END,
                     DOMINIO = :dominio,
                     PERMISO_ADMIN = :permisoAdmin,
-                    PERMISO_CONSULTA = :permisoConsulta,
                     ID_DEPTO_PERMISO = :idDepto,
-                    ID_AREA_PERMISO = :idArea
+                    ID_AREA_PERMISO = :idArea,
+                    PERMISO_SECRETARIA = :secretaria,
+                    ID_EMPLEADO_PERMISO = :idEmpleadoPerfil
                 WHERE ID_USUARIO = :idUsuario
-                  AND ROL = 'Permisos'
                 """, cancellationToken,
                 [("usuario", jefe.Usuario.Trim()), ("nombrePersona", jefe.NombrePersona.Trim()),
                  ("estado", estado), ("dominioP", jefe.DominioP.Trim().ToUpperInvariant()), ("dominio", jefe.Dominio),
@@ -432,93 +448,102 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                  .. perfil.Parametros(), ("idUsuario", idUsuario)]) == 1;
         }, cancellationToken);
 
-    // Solo las cuentas propias del sistema con usuario local; las de inventario se restablecen allá.
+    // Solo los usuarios locales; los de dominio usan su contraseña de Active Directory.
     public Task<bool> ResetJefePassword(PermisoAlcance alcance, int idUsuario, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
             var actual = await LeerUsuario(connection, transaction, idUsuario, cancellationToken);
             if (actual is null || !Administra(alcance, actual)) return false;
             return await Execute(connection, transaction, """
-                UPDATE USUARIOS
+                UPDATE USUARIOS_PERMISOS
                 SET PASSWORD_HASH = :passwordHash,
                     CLAVE_SEGURA = '0'
                 WHERE ID_USUARIO = :idUsuario
                   AND DOMINIO = 0
-                  AND ROL = 'Permisos'
                 """, cancellationToken,
                 ("passwordHash", PasswordHashing.Hash(InitialPassword)), ("idUsuario", idUsuario)) == 1;
         }, cancellationToken);
 
-    // Cuentas de inventario activas sin acceso a permisos. USUARIOS no tiene departamento, así
-    // que el administrador general recibe la lista completa y el de departamento solo la cuenta
-    // cuyo usuario escribe exacto (no ve las cuentas de toda la institución).
-    public Task<IReadOnlyList<PermisoUsuarioInventarioDto>> GetUsuariosInventario(
-        PermisoAlcance alcance,
-        string? usuario,
-        CancellationToken cancellationToken) =>
-        ReadList($"""
-            SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA
-            FROM USUARIOS u
-            WHERE NVL(ROL, '-') <> 'Permisos'
-              AND NVL(PERMISO_ADMIN, 0) = 0
-              AND NVL(PERMISO_CONSULTA, 0) = 0
-              AND ID_DEPTO_PERMISO IS NULL
-              AND ID_AREA_PERMISO IS NULL
-              AND {VigenteSql}
-              {(alcance.EsAdmin ? string.Empty : "AND LOWER(TRIM(USUARIO)) = LOWER(TRIM(:usuario))")}
-            ORDER BY UPPER(NOMBRE_PERSONA), USUARIO
-            """, reader => new PermisoUsuarioInventarioDto(
-                ReadInt(reader, "ID_USUARIO"),
-                ReadString(reader, "USUARIO"),
-                ReadString(reader, "NOMBRE_PERSONA")),
-            cancellationToken, alcance.EsAdmin ? [] : [("usuario", usuario ?? string.Empty)]);
-
-    public Task<bool> QuitarAcceso(PermisoAlcance alcance, int idUsuario, CancellationToken cancellationToken) =>
+    // Borra la cuenta. Los permisos no guardan quién los registró, así que no queda nada colgado.
+    // Nadie se elimina a sí mismo (así siempre queda al menos un administrador general).
+    public Task<bool> DeleteJefe(PermisoAlcance alcance, int idUsuario, CancellationToken cancellationToken) =>
         InTransaction(async (connection, transaction) =>
         {
-            if (idUsuario == alcance.IdUsuario) throw new ArgumentException("No puedes quitarte tu propio acceso.");
+            if (idUsuario == alcance.IdUsuario) throw new ArgumentException("No puedes eliminar tu propio usuario.");
             var actual = await LeerUsuario(connection, transaction, idUsuario, cancellationToken);
-            if (actual is null || actual.SoloPermisos || !Administra(alcance, actual)) return false;
+            if (actual is null || (actual.Nivel is not null && !Administra(alcance, actual))) return false;
             return await Execute(connection, transaction, """
-                UPDATE USUARIOS
-                SET PERMISO_ADMIN = 0, PERMISO_CONSULTA = 0, ID_DEPTO_PERMISO = NULL, ID_AREA_PERMISO = NULL
-                WHERE ID_USUARIO = :idUsuario
+                DELETE FROM USUARIOS_PERMISOS WHERE ID_USUARIO = :idUsuario
                 """, cancellationToken, ("idUsuario", idUsuario)) == 1;
         }, cancellationToken);
 
     // ---- Reglas --------------------------------------------------------------------------
 
-    // Solo el administrador general asigna administradores de departamento y consulta; el de
-    // departamento solo nombra jefes de las áreas de su departamento. El nivel de administrador
-    // general no se asigna a nadie más (hay uno solo): solo lo conserva quien ya lo tiene
-    // (nivelActual). Devuelve las columnas de perfil a guardar.
+    // Solo el administrador general asigna administradores generales (el sistema lo administran
+    // varias personas) y jefes de departamento; el jefe de departamento solo nombra jefes de las
+    // áreas de su departamento. La consulta ya no se asigna. Devuelve las columnas de perfil a guardar.
     internal static async Task<Perfil> ValidarNivel(
         DbConnection connection,
         DbTransaction transaction,
         PermisoAlcance alcance,
         SavePermisoJefeDto jefe,
-        string? nivelActual,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        int? idUsuarioActual = null)
     {
-        if (!alcance.EsAdmin && jefe.Nivel != PermisoValores.NivelJefe)
+        // El de departamento solo nombra a los suyos: jefes de sus áreas, su secretaría y los
+        // empleados de su departamento.
+        if (!alcance.EsAdmin
+            && jefe.Nivel is not (PermisoValores.NivelJefe or PermisoValores.NivelSecretaria or PermisoValores.NivelUsuario))
         {
-            throw new UnauthorizedAccessException("Solo el administrador general asigna administradores y usuarios de consulta.");
+            throw new UnauthorizedAccessException("Solo el administrador general asigna administradores generales y jefes de departamento.");
         }
 
         switch (jefe.Nivel)
         {
             case PermisoValores.NivelAdmin:
-                if (nivelActual != PermisoValores.NivelAdmin)
-                {
-                    throw new ArgumentException("El nivel de administrador general no se puede asignar a otro usuario.");
-                }
-                return new Perfil(1, 0, null, null);
+                return new Perfil(1, null, null);
             case PermisoValores.NivelConsulta:
-                return new Perfil(0, 1, null, null);
+                throw new ArgumentException("El nivel de consulta ya no se asigna.");
+            case PermisoValores.NivelSecretaria:
+                var idDepartamentoSecretaria = jefe.IdDepartamento
+                    ?? throw new ArgumentException("Selecciona el departamento de la secretaría.");
+                if (!alcance.EsAdmin && idDepartamentoSecretaria != alcance.IdDepartamento)
+                {
+                    throw new UnauthorizedAccessException("Solo puedes nombrar la secretaría de tu departamento.");
+                }
+                await ValidarDepartamentoActivo(connection, transaction, idDepartamentoSecretaria, cancellationToken);
+                return new Perfil(0, idDepartamentoSecretaria, null, 1);
             case PermisoValores.NivelAdminDepartamento:
                 var idDepartamento = jefe.IdDepartamento ?? throw new ArgumentException("Selecciona el departamento que administra.");
                 await ValidarDepartamentoActivo(connection, transaction, idDepartamento, cancellationToken);
-                return new Perfil(0, 0, idDepartamento, null);
+                return new Perfil(0, idDepartamento, null);
+            // Empleado: la cuenta queda atada a su ficha, y solo ve y registra lo suyo.
+            case PermisoValores.NivelUsuario:
+                var idEmpleado = jefe.IdEmpleado ?? throw new ArgumentException("Selecciona al empleado de la cuenta.");
+                var empleado = await ReadRows(connection, transaction, """
+                    SELECT e.DEPARTAMENTO_IHSS_ID
+                    FROM EMPLEADOS_IHSS e
+                    JOIN PERMISO_DEPARTAMENTO pd ON pd.DEPARTAMENTO_IHSS_ID = e.DEPARTAMENTO_IHSS_ID
+                    WHERE e.EMPLEADOS_IHSS_ID = :idEmpleado AND e.ESTADO = 1 AND pd.ESTADO = 'ACTIVO'
+                    """, reader => ReadInt(reader, "DEPARTAMENTO_IHSS_ID"), cancellationToken, ("idEmpleado", idEmpleado));
+                if (empleado.Count == 0)
+                {
+                    throw new ArgumentException("El empleado no está activo o su departamento no usa el sistema.");
+                }
+                if (!alcance.EsAdmin && empleado[0] != alcance.IdDepartamento)
+                {
+                    throw new UnauthorizedAccessException("Solo puedes crear cuentas de los empleados de tu departamento.");
+                }
+                var repetido = await ReadRows(connection, transaction, """
+                    SELECT USUARIO FROM USUARIOS_PERMISOS
+                    WHERE ID_EMPLEADO_PERMISO = :idEmpleado AND ID_USUARIO <> :idUsuario AND ROWNUM = 1
+                    """, reader => ReadString(reader, "USUARIO"), cancellationToken,
+                    ("idEmpleado", idEmpleado), ("idUsuario", idUsuarioActual ?? 0));
+                if (repetido.Count > 0)
+                {
+                    throw new ArgumentException($"Ese empleado ya tiene la cuenta {repetido[0].Trim()}.");
+                }
+                return new Perfil(0, null, null, 0, idEmpleado);
             default:
                 var idArea = jefe.IdArea ?? throw new ArgumentException("Selecciona el área del jefe.");
                 var area = await ReadRows(connection, transaction, """
@@ -532,16 +557,18 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
                 {
                     throw new UnauthorizedAccessException("Solo puedes nombrar jefes de las áreas de tu departamento.");
                 }
-                return new Perfil(0, 0, null, idArea);
+                return new Perfil(0, null, idArea);
         }
     }
 
-    // El general administra a todos; el de departamento solo a los jefes de sus áreas.
+    // El general administra a todos; el de departamento, a los jefes de sus áreas y a la
+    // secretaría de su departamento.
     private static bool Administra(PermisoAlcance alcance, UsuarioPermiso usuario) =>
         alcance.EsAdmin
         || (alcance.Nivel == PermisoValores.NivelAdminDepartamento
-            && usuario.Nivel == PermisoValores.NivelJefe
-            && usuario.IdDepartamentoArea == alcance.IdDepartamento);
+            && ((usuario.Nivel == PermisoValores.NivelJefe && usuario.IdDepartamentoArea == alcance.IdDepartamento)
+                || (usuario.Nivel == PermisoValores.NivelSecretaria && usuario.IdDepartamento == alcance.IdDepartamento)
+                || (usuario.Nivel == PermisoValores.NivelUsuario && usuario.IdDepartamentoEmpleado == alcance.IdDepartamento)));
 
     private static async Task<UsuarioPermiso?> LeerUsuario(
         DbConnection connection,
@@ -550,15 +577,18 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
         CancellationToken cancellationToken)
     {
         var filas = await ReadRows(connection, transaction, """
-            SELECT u.ROL, u.PERMISO_ADMIN, u.PERMISO_CONSULTA, u.ID_DEPTO_PERMISO, u.ID_AREA_PERMISO,
-                   a.DEPARTAMENTO_IHSS_ID AS DEPTO_AREA
-            FROM USUARIOS u
+            SELECT u.PERMISO_ADMIN, u.PERMISO_SECRETARIA, u.ID_DEPTO_PERMISO, u.ID_AREA_PERMISO,
+                   u.ID_EMPLEADO_PERMISO, a.DEPARTAMENTO_IHSS_ID AS DEPTO_AREA,
+                   emp.DEPARTAMENTO_IHSS_ID AS DEPTO_EMPLEADO
+            FROM USUARIOS_PERMISOS u
             LEFT JOIN PERMISO_AREA a ON a.ID_AREA = u.ID_AREA_PERMISO
+            LEFT JOIN EMPLEADOS_IHSS emp ON emp.EMPLEADOS_IHSS_ID = u.ID_EMPLEADO_PERMISO
             WHERE u.ID_USUARIO = :idUsuario
             """, reader => new UsuarioPermiso(
-                EsSoloPermisos(ReadNullableString(reader, "ROL")),
                 NivelDe(reader) is { Length: > 0 } nivel ? nivel : null,
-                ReadNullableInt(reader, "DEPTO_AREA")),
+                ReadNullableInt(reader, "DEPTO_AREA"),
+                ReadNullableInt(reader, "ID_DEPTO_PERMISO"),
+                ReadNullableInt(reader, "DEPTO_EMPLEADO")),
             cancellationToken, ("idUsuario", idUsuario));
         return filas.Count == 0 ? null : filas[0];
     }
@@ -567,13 +597,15 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
     private static string NivelDe(DbDataReader reader)
     {
         if (ReadNullableInt(reader, "PERMISO_ADMIN") == 1) return PermisoValores.NivelAdmin;
-        if (ReadNullableInt(reader, "PERMISO_CONSULTA") == 1) return PermisoValores.NivelConsulta;
-        if (ReadNullableInt(reader, "ID_DEPTO_PERMISO") is not null) return PermisoValores.NivelAdminDepartamento;
-        return ReadNullableInt(reader, "ID_AREA_PERMISO") is not null ? PermisoValores.NivelJefe : string.Empty;
+        if (ReadNullableInt(reader, "ID_DEPTO_PERMISO") is not null)
+        {
+            return ReadNullableInt(reader, "PERMISO_SECRETARIA") == 1
+                ? PermisoValores.NivelSecretaria
+                : PermisoValores.NivelAdminDepartamento;
+        }
+        if (ReadNullableInt(reader, "ID_AREA_PERMISO") is not null) return PermisoValores.NivelJefe;
+        return ReadNullableInt(reader, "ID_EMPLEADO_PERMISO") is not null ? PermisoValores.NivelUsuario : string.Empty;
     }
-
-    private static bool EsSoloPermisos(string? rol) =>
-        string.Equals(rol?.Trim(), AppRoles.Permisos, StringComparison.OrdinalIgnoreCase);
 
     private static async Task ValidarDepartamentoActivo(
         DbConnection connection,
@@ -605,8 +637,7 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
         if (repetida) throw new ArgumentException("Ya existe un área con ese nombre en el departamento.");
     }
 
-    // El nombre de usuario debe ser único en todo USUARIOS porque el login busca por él. Si la
-    // persona ya tiene cuenta de inventario, se le da acceso a esa cuenta en lugar de crear otra.
+    // El nombre de usuario no se repite (sin distinguir mayúsculas ni espacios) porque el login busca por él.
     private static async Task ValidarUsuario(
         DbConnection connection,
         DbTransaction transaction,
@@ -615,26 +646,21 @@ public sealed class PermisoAreaService(PermisosDbContext dbContext) : OracleRepo
         CancellationToken cancellationToken)
     {
         var repetido = await Exists(connection, transaction, """
-            SELECT 1 FROM USUARIOS
+            SELECT 1 FROM USUARIOS_PERMISOS
             WHERE LOWER(TRIM(USUARIO)) = LOWER(TRIM(:usuario)) AND ID_USUARIO <> :idUsuario
             """, cancellationToken, ("usuario", usuario), ("idUsuario", idUsuario ?? 0));
-        if (repetido)
-        {
-            throw new ArgumentException(
-                "Ya existe un usuario con ese nombre. Si es una cuenta de inventario, usa \"Dar acceso a usuario de inventario\".");
-        }
+        if (repetido) throw new ArgumentException("Ya existe un usuario con ese nombre.");
     }
 
-    // Columnas de perfil de USUARIOS para un nivel (solo una queda con valor).
-    internal sealed record Perfil(int PermisoAdmin, int PermisoConsulta, int? IdDepartamento, int? IdArea)
+    // Columnas de perfil de USUARIOS_PERMISOS para un nivel (solo una queda con valor).
+    internal sealed record Perfil(int PermisoAdmin, int? IdDepartamento, int? IdArea, int PermisoSecretaria = 0, int? IdEmpleado = null)
     {
         public (string Name, object? Value)[] Parametros() =>
-        [
-            ("permisoAdmin", PermisoAdmin), ("permisoConsulta", PermisoConsulta),
-            ("idDepto", IdDepartamento), ("idArea", IdArea),
-        ];
+            [("permisoAdmin", PermisoAdmin), ("idDepto", IdDepartamento), ("idArea", IdArea),
+             ("secretaria", PermisoSecretaria), ("idEmpleadoPerfil", IdEmpleado)];
     }
 
-    // Usuario existente: si es cuenta propia de permisos, su nivel y el departamento de su área.
-    private sealed record UsuarioPermiso(bool SoloPermisos, string? Nivel, int? IdDepartamentoArea);
+    // Usuario existente: su nivel, el departamento de su área y el que administra (o del que es
+    // secretaría), para saber quién puede editarlo.
+    private sealed record UsuarioPermiso(string? Nivel, int? IdDepartamentoArea, int? IdDepartamento, int? IdDepartamentoEmpleado);
 }

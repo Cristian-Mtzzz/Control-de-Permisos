@@ -1,139 +1,90 @@
-/* Estilos de la tarjeta y controles del formulario de autenticación. */
+/* Login: el instituto en azul añil con su escudo dorado a la izquierda y el formulario a la
+   derecha. En pantallas angostas el bloque del instituto queda arriba. */
 :host {
   display: block;
   min-height: 100dvh;
 }
 
 .auth-shell {
+  display: grid;
+  /* La parte azul tiene un ancho fijo; el formulario ocupa el resto. */
+  grid-template-columns: minmax(320px, 520px) 1fr;
   min-height: 100dvh;
-  background: #f4f8f6;
+  background: var(--papel);
 }
 
-@keyframes authHeaderReveal {
-  from {
-    opacity: 0;
-    transform: translateY(-10px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes authHeaderGradientShift {
-
-  0%,
-  100% {
-    background-position: 0% 50%;
-  }
-
-  50% {
-    background-position: 100% 50%;
-  }
-}
-
-@keyframes authFadeSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(18px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes authErrorPop {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.app-header {
+.auth-brand {
   display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  height: 72px;
-  padding: 0 10px;
-  color: #f7faf8;
-  background: linear-gradient(120deg, #1f5857, #2f8683 55%, #276968);
-  background-size: 200% 200%;
-  box-shadow: 0 4px 18px rgba(23, 63, 67, .22);
-  position: relative;
-  overflow: hidden;
-  animation: authHeaderReveal .5s ease, authHeaderGradientShift 10s ease-in-out infinite;
-}
-
-.app-header::after {
-  content: '';
-  position: absolute;
-  inset: auto 0 0 0;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, .65), transparent);
-}
-
-.header-title {
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: 1.05rem;
-  font-weight: 600;
-  letter-spacing: .01em;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: clamp(2rem, 5vw, 4rem);
+  color: #c9d3e1;
+  background: var(--anil);
 }
 
 .brand-logo {
-  /* Logo dorado sin márgenes (634x309); el ancho sale de su proporción. Se aclara un poco y
-     lleva un contorno oscuro fino para que el dorado se distinga sobre el verde. */
-  flex: none;
-  width: auto;
-  max-width: 45vw;
-  height: 56px;
-  object-fit: contain;
-  filter: brightness(1.3) saturate(1.15)
-    drop-shadow(0 1px 1px rgba(8, 30, 31, .55))
-    drop-shadow(0 0 3px rgba(8, 30, 31, .35));
+  width: min(100%, 306px);
+  height: auto;
 }
 
+.brand-copy h1 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(2rem, 2.6vw, 2.45rem);
+  font-weight: 700;
+  letter-spacing: -.02em;
+  line-height: 1.1;
+}
+
+/* Raya dorada bajo el nombre: el mismo acento de la sección abierta en el panel. */
+.brand-copy h1::after {
+  display: block;
+  width: 3rem;
+  height: 3px;
+  margin-top: 1.1rem;
+  border-radius: 2px;
+  background: var(--oro);
+  content: '';
+}
+
+.brand-copy p {
+  max-width: 28rem;
+  margin: 1.1rem 0 0;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.auth-brand small {
+  color: #93a1b5;
+  font-size: .8rem;
+}
+
+/* El formulario va un poco a la izquierda del centro de su lado: el 40 % del espacio libre a su izquierda. */
 .form-panel {
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  min-height: calc(100dvh - 72px);
-  padding: 3rem 1.5rem 1.5rem;
+  min-height: 100dvh;
+  padding: 3rem 1.5rem 1.5rem max(1.5rem, calc((100% - 380px) * .4));
 }
 
 .form-wrap {
-  width: min(100%, 390px);
-  margin: auto;
-  animation: authFadeSlideUp .5s ease both;
-}
-
-.eyebrow {
-  margin: 0 0 1rem;
-  color: #397b78;
-  font-size: .7rem;
-  font-weight: 700;
-  letter-spacing: .16em;
+  width: min(100%, 380px);
+  margin: auto 0;
 }
 
 h2 {
   margin: 0;
-  color: #18383b;
-  font-family: 'Space Grotesk', sans-serif;
-  font-size: clamp(2rem, 4vw, 3rem);
-  font-weight: 600;
-  letter-spacing: 0;
+  color: var(--tinta);
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -.015em;
 }
 
 .form-intro {
-  margin: .85rem 0 2.8rem;
-  color: #718080;
+  margin: .4rem 0 2rem;
+  color: var(--gris);
   font-size: .95rem;
 }
 
@@ -143,30 +94,31 @@ form {
 }
 
 label {
-  margin: 0 0 .55rem;
-  color: #294649;
-  font-size: .78rem;
-  font-weight: 700;
+  margin: 0 0 .45rem;
+  color: var(--tinta-2);
+  font-size: .85rem;
+  font-weight: 600;
 }
 
 label:not(:first-child) {
-  margin-top: 1.35rem;
+  margin-top: 1.2rem;
 }
 
 input {
   width: 100%;
-  padding: .95rem 1rem;
-  border: 1px solid #d7e2df;
-  border-radius: 5px;
+  min-height: 2.9rem;
+  padding: .7rem .9rem;
+  border: 1px solid var(--linea-2);
+  border-radius: var(--radio);
   outline: none;
-  color: #203238;
-  background: #fff;
-  transition: border-color .2s ease, box-shadow .2s ease;
+  color: var(--tinta);
+  background: var(--superficie);
+  transition: border-color .15s ease, box-shadow .15s ease;
 }
 
 input:focus {
-  border-color: #397b78;
-  box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
+  border-color: var(--primario);
+  box-shadow: 0 0 0 3px rgba(31, 78, 140, .14);
 }
 
 .password-field {
@@ -174,81 +126,69 @@ input:focus {
 }
 
 .password-field input {
-  padding-right: 4rem;
+  padding-right: 4.5rem;
 }
 
 .password-toggle {
   position: absolute;
   top: 50%;
-  right: .8rem;
-  transform: translateY(-50%);
+  right: .45rem;
+  padding: .35rem .6rem;
   border: 0;
-  color: #397b78;
+  border-radius: 6px;
+  color: var(--primario);
   background: transparent;
   cursor: pointer;
-  font-size: .75rem;
-  font-weight: 700;
+  font-size: .8rem;
+  font-weight: 600;
+  transform: translateY(-50%);
+}
+
+.password-toggle:hover {
+  background: var(--primario-suave);
 }
 
 .field-error {
   margin-top: .4rem;
-  color: #bd5b52;
-  font-size: .72rem;
+  color: var(--peligro);
+  font-size: .78rem;
+}
+
+.info-banner,
+.error-banner {
+  margin: 1.2rem 0 0;
+  padding: .7rem .85rem;
+  border: 1px solid;
+  border-radius: var(--radio);
+  font-size: .84rem;
 }
 
 .info-banner {
-  margin: 1.2rem 0 0;
-  padding: .75rem;
-  border-radius: 4px;
-  color: #1f5c4b;
-  background: #e6f3ee;
-  font-size: .78rem;
+  border-color: #b9dfc9;
+  color: var(--ok);
+  background: var(--ok-suave);
 }
 
 .error-banner {
-  margin: 1.2rem 0 0;
-  padding: .75rem;
-  border-radius: 4px;
-  color: #9b3f38;
-  background: #fcece9;
-  font-size: .78rem;
-  animation: authErrorPop .3s ease;
+  border-color: #ecc4c4;
+  color: var(--peligro);
+  background: var(--peligro-suave);
 }
 
 .submit-button {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 2rem;
-  padding: 1rem 1.15rem;
+  min-height: 2.9rem;
+  margin-top: 1.8rem;
   border: 0;
-  border-radius: 5px;
-  color: #f7faf8;
-  background: #276968;
+  border-radius: var(--radio);
+  color: #fff;
+  background: var(--primario);
   cursor: pointer;
-  font-weight: 700;
-  position: relative;
-  overflow: hidden;
-  transition: background .2s, transform .2s, box-shadow .2s;
-}
-
-.submit-button::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, .22), transparent);
-  transform: translateX(-120%);
-  transition: transform .5s ease;
-}
-
-.submit-button:hover:not(:disabled)::before {
-  transform: translateX(120%);
+  font-size: .95rem;
+  font-weight: 600;
 }
 
 .submit-button:hover:not(:disabled) {
-  background: #1b5252;
-  transform: translateY(-1px);
-  box-shadow: 0 10px 22px rgba(27, 82, 82, .28);
+  background: var(--primario-hover);
 }
 
 .submit-button:disabled {
@@ -256,53 +196,48 @@ input:focus {
   opacity: .65;
 }
 
-.submit-arrow {
-  transition: transform .25s ease;
-}
-
-.submit-button:hover:not(:disabled) .submit-arrow {
-  transform: translateX(4px);
-}
-
-.security-note {
-  margin: 2rem 0 0;
-  color: #8b9b99;
-  font-size: .72rem;
-  text-align: center;
-}
-
-.security-note span {
-  margin-right: .3rem;
-  color: #397b78;
-}
-
 footer {
-  color: #9aa8a5;
-  font-size: .7rem;
-  text-align: center;
+  width: min(100%, 380px);
+  color: var(--gris-2);
+  font-size: .78rem;
 }
 
-footer span {
-  margin: 0 .5rem;
-  color: #cad3d0;
-}
+@media (max-width: 820px) {
+  .auth-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
 
-@media (max-width: 520px) {
-  .app-header {
-    height: 60px;
+  .auth-brand {
+    gap: 1.25rem;
+    padding: 1.5rem 1.25rem 1.75rem;
   }
 
   .brand-logo {
-    height: 42px;
-    max-width: 45vw;
+    width: 162px;
   }
 
-  .header-title {
-    font-size: .7rem;
+  .brand-copy h1 {
+    font-size: 1.6rem;
+  }
+
+  .brand-copy h1::after,
+  .auth-brand small {
+    display: none;
+  }
+
+  .brand-copy p {
+    margin-top: .5rem;
+    font-size: .9rem;
   }
 
   .form-panel {
-    min-height: calc(100dvh - 60px);
-    padding-top: 2.5rem;
+    align-items: center;
+    min-height: auto;
+    gap: 2.5rem;
+    padding: 2rem 1.5rem 1.5rem;
+  }
+
+  footer {
+    text-align: center;
   }
 }

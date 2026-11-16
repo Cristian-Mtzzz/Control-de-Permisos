@@ -4,8 +4,8 @@ import { Observable, map } from 'rxjs';
 import { apiUrl } from '../api-url';
 import { toPascalCase } from '../shared/api-response';
 import {
-  Permiso, PermisoDepartamentoDisponible, PermisoEmpleado, PermisoJefe, PermisoSesion, PermisoUsuarioInventario,
-  SavePermisoDiaRequest, SavePermisoHoraRequest, SavePermisoJefeRequest,
+  Permiso, PermisoDepartamentoDisponible, PermisoEmpleado, PermisoJefe, PermisoLogo, PermisoSesion,
+  SavePermisoDiaRequest, SavePermisoHoraRequest, SavePermisoJefeRequest, SaveVacacionRequest, SaveVacacionesRequest,
 } from './permisos.models';
 
 const API_PERMISOS_URL = apiUrl('permisos');
@@ -49,6 +49,15 @@ export class PermisosService {
       : this.httpClient.put<void>(`${API_PERMISOS_URL}/hora/${idPermiso}`, permiso);
   }
 
+  createVacaciones(vacaciones: SaveVacacionesRequest): Observable<void> {
+    return this.httpClient.post<void>(`${API_PERMISOS_URL}/vacaciones`, vacaciones);
+  }
+
+  updateVacacion(idPermiso: number, vacacion: SaveVacacionRequest): Observable<void> {
+    return this.httpClient.put<void>(`${API_PERMISOS_URL}/vacaciones/${idPermiso}`, vacacion);
+  }
+
+  // Anula permisos y vacaciones.
   anularPermiso(idPermiso: number): Observable<void> {
     return this.httpClient.put<void>(`${API_PERMISOS_URL}/${idPermiso}/anular`, {});
   }
@@ -59,6 +68,11 @@ export class PermisosService {
 
   quitarArea(idEmpleado: number): Observable<void> {
     return this.httpClient.delete<void>(`${API_PERMISOS_URL}/personal/${idEmpleado}`);
+  }
+
+  // No. de pago del empleado (EMPLEADOS_IHSS.NPAGO); vacío lo borra.
+  guardarNoPagoEmpleado(idEmpleado: number, noPago: string): Observable<void> {
+    return this.httpClient.put<void>(`${API_PERMISOS_URL}/personal/${idEmpleado}/no-pago`, { NoPago: noPago });
   }
 
   // ---- Departamentos (administrador general) -------------------------------------------
@@ -100,15 +114,13 @@ export class PermisosService {
     return this.httpClient.put<void>(`${API_PERMISOS_URL}/jefes/${idUsuario}/reset-password`, {});
   }
 
-  // El administrador general recibe todas; el de departamento indica el usuario exacto.
-  getUsuariosInventario(usuario = ''): Observable<PermisoUsuarioInventario[]> {
-    const params = usuario.trim() ? { usuario: usuario.trim() } : undefined;
-    return this.httpClient.get<unknown>(`${API_PERMISOS_URL}/usuarios-inventario`, { params })
-      .pipe(map((body) => toPascalCase<PermisoUsuarioInventario[]>(body)));
+  deleteJefe(idUsuario: number): Observable<void> {
+    return this.httpClient.delete<void>(`${API_PERMISOS_URL}/jefes/${idUsuario}`);
   }
 
-  // Solo cuentas de inventario: les quita el área y la administración; en inventario siguen igual.
-  quitarAcceso(idUsuario: number): Observable<void> {
-    return this.httpClient.delete<void>(`${API_PERMISOS_URL}/jefes/${idUsuario}/acceso`);
+  // Logos del encabezado de los formatos de impresión, como estén en la tabla PERMISO_LOGO: el
+  // que no se haya cargado no viene y el formato usa el que trae el sistema.
+  getLogos(): Observable<PermisoLogo[]> {
+    return this.httpClient.get<unknown>(`${API_PERMISOS_URL}/logos`).pipe(map((body) => toPascalCase<PermisoLogo[]>(body)));
   }
 }

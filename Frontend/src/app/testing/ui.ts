@@ -170,7 +170,9 @@ export const areas: PermisoArea[] = [
 
 export function sesion(nivel: PermisoSesion['Nivel']): PermisoSesion {
   switch (nivel) {
+    // La secretaría ve lo mismo que el administrador de su departamento, pero no registra.
     case 'ADMIN_DEPTO':
+    case 'SECRETARIA':
       return {
         Nivel: nivel, IdDepartamento: 10, NombreDepartamento: 'INFORMATICA', IdArea: null, NombreArea: null,
         Departamentos: [departamentos[0]], Areas: areas.filter((area) => area.IdDepartamento === 10),
@@ -228,7 +230,8 @@ export const permisos: Permiso[] = [
 export function jefe(datos: Partial<PermisoJefe> & Pick<PermisoJefe, 'IdUsuario'>): PermisoJefe {
   return {
     Usuario: 'usuario', NombrePersona: 'USUARIO', Nivel: 'JEFE', IdDepartamento: 10, NombreDepartamento: 'INFORMATICA',
-    IdArea: 100, NombreArea: 'SOPORTE', Estado: 'ACTIVO', Dominio: 0, DominioP: 'BA', SoloPermisos: true, ...datos,
+    IdArea: 100, NombreArea: 'SOPORTE', Estado: 'ACTIVO', Dominio: 0, DominioP: 'BA',
+    IdEmpleado: null, NombreEmpleado: null, ...datos,
   };
 }
 
@@ -236,6 +239,6 @@ export const jefes: PermisoJefe[] = [
   jefe({ IdUsuario: 50, Usuario: 'admin.permisos', NombrePersona: 'ADMINISTRADOR', Nivel: 'ADMIN', IdDepartamento: null, IdArea: null, NombreArea: null, NombreDepartamento: null }),
   jefe({ IdUsuario: 51, Usuario: 'jefe.soporte', NombrePersona: 'JEFE SOPORTE' }),
   jefe({ IdUsuario: 52, Usuario: 'BA\\jefe.dominio', NombrePersona: 'JEFE DOMINIO', Dominio: 1, IdArea: 101, NombreArea: 'DESARROLLO' }),
-  jefe({ IdUsuario: 53, Usuario: 'inventario.rrhh', NombrePersona: 'JEFE NOMINA', SoloPermisos: false, IdDepartamento: 20, NombreDepartamento: 'RECURSOS HUMANOS', IdArea: 200, NombreArea: 'NOMINA' }),
+  jefe({ IdUsuario: 53, Usuario: 'jefe.nomina', NombrePersona: 'JEFE NOMINA', IdDepartamento: 20, NombreDepartamento: 'RECURSOS HUMANOS', IdArea: 200, NombreArea: 'NOMINA' }),
   jefe({ IdUsuario: 54, Usuario: 'admin.rrhh', NombrePersona: 'ADMIN RRHH', Nivel: 'ADMIN_DEPTO', IdDepartamento: 20, NombreDepartamento: 'RECURSOS HUMANOS', IdArea: null, NombreArea: null }),
 ];

@@ -76,8 +76,9 @@ export type MinutosJornada = number | ((permiso: Permiso) => number);
 const minutosDe = (minutosJornada: MinutosJornada, permiso: Permiso): number =>
   typeof minutosJornada === 'number' ? minutosJornada : minutosJornada(permiso);
 
-/** Días que representa el permiso: los hábiles, o las horas divididas entre la jornada. */
+/** Días que representa el permiso: los hábiles, o las horas divididas entre la jornada. Las vacaciones no son permiso: 0. */
 export function equivalentDays(permiso: Permiso, minutosJornada: number): number {
+  if (permiso.Tipo === 'VAC') return 0;
   return permiso.Tipo === 'DIA' ? permiso.DiasHabiles : permiso.Minutos / Math.max(minutosJornada, 1);
 }
 
@@ -140,8 +141,10 @@ export interface ResumenEmpleado {
   Dias: number;
   PermisosHora: number;
   Minutos: number;
-  // Días + horas convertidas con la jornada (jornada completa = 1 día).
+  // Días + horas convertidas con la jornada (jornada completa = 1 día). No incluye vacaciones.
   TotalDias: number;
+  // Días hábiles de vacaciones (aparte de los permisos).
+  DiasVacaciones: number;
 }
 
 /** Totales por empleado de los permisos activos recibidos, de mayor a menor uso. */
@@ -150,9 +153,11 @@ export function resumenPorEmpleado(permisos: readonly Permiso[], minutosJornada:
   for (const permiso of permisos.filter(isActive)) {
     const row = rows.get(permiso.IdEmpleado) ?? {
       IdEmpleado: permiso.IdEmpleado, Empleado: permiso.Empleado,
-      PermisosDia: 0, Dias: 0, PermisosHora: 0, Minutos: 0, TotalDias: 0,
+      PermisosDia: 0, Dias: 0, PermisosHora: 0, Minutos: 0, TotalDias: 0, DiasVacaciones: 0,
     };
-    if (permiso.Tipo === 'DIA') {
+    if (permiso.Tipo === 'VAC') {
+      row.DiasVacaciones += permiso.DiasHabiles;
+    } else if (permiso.Tipo === 'DIA') {
       row.PermisosDia++;
       row.Dias += permiso.DiasHabiles;
     } else {
@@ -186,7 +191,7 @@ export function consumoEmpleado(
   const propios = permisos.filter((permiso) => permiso.IdEmpleado === idEmpleado && permiso.IdPermiso !== excluirId);
   const total = (periodo: PermisoPeriodo): ResumenEmpleado =>
     resumenPorEmpleado(propios.filter((permiso) => inPeriod(permiso, periodo, today)), minutosJornada)[0] ?? {
-      IdEmpleado: idEmpleado, Empleado: '', PermisosDia: 0, Dias: 0, PermisosHora: 0, Minutos: 0, TotalDias: 0,
+      IdEmpleado: idEmpleado, Empleado: '', PermisosDia: 0, Dias: 0, PermisosHora: 0, Minutos: 0, TotalDias: 0, DiasVacaciones: 0,
     };
   return { Mes: total('mes'), Anio: total('anio'), Todo: total('todo') };
 }

@@ -12,7 +12,8 @@ internal sealed record PermisoParametros(
     decimal? MaxDiasPorPermiso,
     decimal? MaxHorasPorPermiso,
     decimal? MaxDiasPorAnio,
-    decimal? MaxHorasPorMes)
+    decimal? MaxHorasPorMes,
+    decimal? MaxDiasPorMes)
 {
     // Filas generales (sin departamento) y las propias de cada departamento; se combinan en Para().
     public const string Sql = """
@@ -24,7 +25,7 @@ internal sealed record PermisoParametros(
     private static readonly string[] FormatosHora = ["HH:mm", "H:mm"];
 
     // Jornada de 08:00 a 16:00 sin límites: la que se muestra mientras se corrige un parámetro mal escrito.
-    public static PermisoParametros PorDefecto { get; } = new(new TimeOnly(8, 0), new TimeOnly(16, 0), null, null, null, null);
+    public static PermisoParametros PorDefecto { get; } = new(new TimeOnly(8, 0), new TimeOnly(16, 0), null, null, null, null, null);
 
     public int MinutosJornada => (int)(FinJornada - InicioJornada).TotalMinutes;
 
@@ -62,7 +63,7 @@ internal sealed record PermisoParametros(
 
         return new PermisoParametros(inicio, fin,
             Limite("MAX_DIAS_POR_PERMISO"), Limite("MAX_HORAS_POR_PERMISO"),
-            Limite("MAX_DIAS_POR_ANIO"), Limite("MAX_HORAS_POR_MES"));
+            Limite("MAX_DIAS_POR_ANIO"), Limite("MAX_HORAS_POR_MES"), Limite("MAX_DIAS_POR_MES"));
     }
 
     public static TimeOnly? TryParseHora(string? valor) =>

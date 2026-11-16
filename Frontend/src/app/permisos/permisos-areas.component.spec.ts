@@ -1,3 +1,4 @@
+import { signal } from '@angular/core';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideHttpClient } from '@angular/common/http';
 import { HttpTestingController, provideHttpClientTesting } from '@angular/common/http/testing';
@@ -5,6 +6,7 @@ import {
   actualizar, boton, botones, campo, clic, elegir, empleados, enviar, errorApi, escribir, jefes, llamada, opcionesDe, sesion,
   sinLlamadas, textoDe,
 } from '../testing/ui';
+import { AuthService } from '../auth/auth.service';
 import { PermisoJefe, PermisoSesion } from './permisos.models';
 import { PermisosAreasComponent } from './permisos-areas.component';
 
@@ -20,11 +22,16 @@ describe('Sección de departamentos, áreas y usuarios', () => {
   const formulario = (): HTMLFormElement => campo(modal(), 'form');
   const alerta = (): string => raiz().querySelector('[role="alert"]')?.textContent?.trim() ?? '';
   const ok = { status: 204, statusText: 'No Content' };
+  // Sesión del administrador general (admin.permisos, el usuario 50 de la lista).
+  const proveedores = () => [
+    provideHttpClient(), provideHttpClientTesting(),
+    { provide: AuthService, useValue: { currentUser: signal({ UserId: 50, UserName: 'admin.permisos', FullName: 'ADMINISTRADOR', Nivel: 'ADMIN' }) } },
+  ];
 
   async function iniciar(datos: PermisoSesion, usuarios: PermisoJefe[] = jefes): Promise<void> {
     TestBed.configureTestingModule({
       imports: [PermisosAreasComponent],
-      providers: [provideHttpClient(), provideHttpClientTesting()],
+      providers: proveedores(),
     });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(PermisosAreasComponent);
@@ -59,7 +66,7 @@ describe('Sección de departamentos, áreas y usuarios', () => {
   });
 
   it('si no se pueden cargar los usuarios lo dice', async () => {
-    TestBed.configureTestingModule({ imports: [PermisosAreasComponent], providers: [provideHttpClient(), provideHttpClientTesting()] });
+    TestBed.configureTestingModule({ imports: [PermisosAreasComponent], providers: proveedores() });
     http = TestBed.inject(HttpTestingController);
     fixture = TestBed.createComponent(PermisosAreasComponent);
     fixture.componentRef.setInput('sesion', sesion('ADMIN'));
@@ -79,31 +86,99 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       expect(texto()).toContain('07:00 a 15:00');
       expect(filaDe(1, 'ANTIGUA').textContent).toContain('INACTIVO');
       expect(botones(filaDe(1, 'ANTIGUA'), 'Activar')).toHaveLength(1);
-      // Local propia: editar y restablecer; dominio: sin restablecer; inventario: editar acceso y quitar.
-      expect(botones(filaDe(2, 'JEFE SOPORTE'), /^(Editar|Restablecer contraseña)$/)).toHaveLength(2);
+      // Local: editar, eliminar y restablecer; dominio: sin restablecer. Ya no se da acceso a cuentas de inventario.
+      expect(botones(filaDe(2, 'JEFE SOPORTE'), /^(Editar|Eliminar|Restablecer contraseña)$/)).toHaveLength(3);
       expect(botones(filaDe(2, 'JEFE DOMINIO'), 'Restablecer contraseña')).toHaveLength(0);
-      expect(botones(filaDe(2, 'JEFE NOMINA'), /^(Editar acceso|Quitar acceso)$/)).toHaveLength(2);
-      expect(filaDe(2, 'JEFE NOMINA').textContent).toContain('Cuenta de inventario');
+      expect(filaDe(2, 'JEFE NOMINA').textContent).toContain('Local');
       expect(filaDe(2, 'JEFE DOMINIO').textContent).toContain('Dominio BA');
+      expect(botones(raiz(), /inventario/)).toHaveLength(0);
+      expect(texto()).not.toContain('inventario');
       expect(filaDe(2, 'ADMINISTRADOR').textContent).toContain('Todos los departamentos');
     });
 
-    it('agregar departamento: filtros, error y éxito', async () => {
+    it('las acciones de las tablas son íconos con su nombre en un globo y para lectores de pantalla', async () => {
+      const acciones = (fila: HTMLElement): (string | null)[] =>
+        Array.from(fila.querySelectorAll('button')).map((accion) => accion.getAttribute('data-tip'));
+      expect(acciones(filaDe(0, 'INFORMATICA'))).toEqual(['Desactivar']);
+      expect(acciones(filaDe(1, 'SOPORTE'))).toEqual(['Editar', 'Desactivar']);
+      expect(acciones(filaDe(1, 'ANTIGUA'))).toEqual(['Editar', 'Activar']);
+      expect(acciones(filaDe(2, 'JEFE SOPORTE'))).toEqual(['Editar', 'Eliminar', 'Restablecer contraseña']);
+      for (const accion of Array.from(filaDe(2, 'JEFE SOPORTE').querySelectorAll('button'))) {
+        expect(accion.classList).toContain('icon-button');
+        expect(accion.querySelector('svg')).not.toBeNull();
+        expect(accion.querySelector('.sr-only')!.textContent!.trim()).toBe(accion.getAttribute('data-tip'));
+      }
+    });
+
+    it('los botones de crear se habilitan solo con el formulario completo', async () => {
+      // Nueva área: nombre y departamento.
+      await clic(fixture, boton(raiz(), 'Nueva área'));
+      const guardarArea = (): HTMLButtonElement => boton(modal(), 'Guardar');
+      expect(guardarArea().disabled).toBe(true);
+      await escribir(fixture, campo(modal(), '#area-nombre'), 'redes');
+      expect(guardarArea().disabled).toBe(true);
+      await elegir(fixture, campo(modal(), '#area-departamento'), 'INFORMATICA');
+      expect(guardarArea().disabled).toBe(false);
+      await clic(fixture, boton(modal(), 'Cerrar ventana'));
+
+      // Nuevo usuario: departamento, área, empleado y usuario.
+      await clic(fixture, boton(raiz(), 'Nuevo usuario'));
+      const crear = (): HTMLButtonElement => boton(modal(), 'Crear usuario');
+      expect(crear().disabled).toBe(true);
+      await elegir(fixture, campo(modal(), '#jefe-departamento'), 'INFORMATICA');
+      await elegir(fixture, campo(modal(), '#jefe-area'), 'SOPORTE');
+      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'ANA LOPEZ');
+      expect(crear().disabled).toBe(true);
+      await escribir(fixture, campo(modal(), '#jefe-usuario'), 'ana.lopez');
+      expect(crear().disabled).toBe(false);
+      // Un usuario en blanco no cuenta.
+      await escribir(fixture, campo(modal(), '#jefe-usuario'), ' ');
+      expect(crear().disabled).toBe(true);
+    });
+
+    it('agregar departamento: regional, edificio y departamento en orden, error y éxito', async () => {
       await clic(fixture, boton(raiz(), 'Agregar departamento'));
       llamada(http, 'GET', '/permisos/departamentos/disponibles').flush([
         { IdDepartamento: 30, Nombre: 'CONTABILIDAD', Empleados: 5, IdEdificio: 1, NombreEdificio: 'CENTRAL', IdRegional: 1, NombreRegional: 'CENTRO' },
         { IdDepartamento: 31, Nombre: 'ALMACEN', Empleados: 3, IdEdificio: 2, NombreEdificio: 'BODEGA', IdRegional: 2, NombreRegional: 'NORTE' },
+        { IdDepartamento: 32, Nombre: 'COMPRAS', Empleados: 2, IdEdificio: 3, NombreEdificio: 'ANEXO', IdRegional: 1, NombreRegional: 'CENTRO' },
+        { IdDepartamento: 33, Nombre: 'SIN UBICAR', Empleados: 1, IdEdificio: null, NombreEdificio: null, IdRegional: null, NombreRegional: null },
       ]);
       await actualizar(fixture);
-      expect(texto()).toContain('2 departamento(s) disponibles');
+      const select = (id: string): HTMLSelectElement => campo<HTMLSelectElement>(modal(), id);
+      // Al abrir solo se puede elegir la regional.
+      expect(opcionesDe(select('#departamento-regional'))).toEqual(['Selecciona la regional', 'CENTRO', 'NORTE', 'Sin regional']);
+      expect(select('#departamento-edificio').disabled).toBe(true);
+      expect(opcionesDe(select('#departamento-edificio'))).toEqual(['Primero elige la regional']);
+      expect(select('#departamento-nuevo').disabled).toBe(true);
+      expect(opcionesDe(select('#departamento-nuevo'))).toEqual(['Primero elige el edificio']);
       expect(boton(modal(), 'Agregar').disabled).toBe(true);
 
-      await elegir(fixture, campo(modal(), '#departamento-nuevo'), 'ALMACEN');
-      // Una regional que no tiene el departamento elegido lo quita.
-      await elegir(fixture, campo(modal(), '#departamento-regional'), 'CENTRO');
-      expect(texto()).toContain('1 departamento(s) disponibles');
+      // La regional habilita solo sus edificios; el edificio, solo sus departamentos.
+      await elegir(fixture, select('#departamento-regional'), 'CENTRO');
+      expect(select('#departamento-edificio').disabled).toBe(false);
+      expect(opcionesDe(select('#departamento-edificio'))).toEqual(['Selecciona el edificio', 'ANEXO', 'CENTRAL']);
+      expect(select('#departamento-nuevo').disabled).toBe(true);
+      await elegir(fixture, select('#departamento-edificio'), 'CENTRAL');
+      expect(select('#departamento-nuevo').disabled).toBe(false);
+      expect(opcionesDe(select('#departamento-nuevo'))).toEqual(['Selecciona el departamento', 'CONTABILIDAD']);
+      expect(texto()).toContain('1 departamento(s) disponibles en este edificio.');
+
+      // Otra regional quita el edificio y el departamento elegidos.
+      await elegir(fixture, select('#departamento-nuevo'), 'CONTABILIDAD');
+      await elegir(fixture, select('#departamento-regional'), 'NORTE');
+      expect(select('#departamento-nuevo').disabled).toBe(true);
       expect(boton(modal(), 'Agregar').disabled).toBe(true);
-      await elegir(fixture, campo(modal(), '#departamento-nuevo'), 'CONTABILIDAD');
+
+      // Un departamento sin regional ni edificio también se puede agregar.
+      await elegir(fixture, select('#departamento-regional'), 'Sin regional');
+      expect(opcionesDe(select('#departamento-edificio'))).toEqual(['Selecciona el edificio', 'Sin edificio']);
+      await elegir(fixture, select('#departamento-edificio'), 'Sin edificio');
+      expect(opcionesDe(select('#departamento-nuevo'))).toEqual(['Selecciona el departamento', 'SIN UBICAR']);
+
+      await elegir(fixture, select('#departamento-regional'), 'CENTRO');
+      await elegir(fixture, select('#departamento-edificio'), 'CENTRAL');
+      await elegir(fixture, select('#departamento-nuevo'), 'CONTABILIDAD');
 
       await enviar(fixture, formulario());
       const agregar = llamada(http, 'POST', '/permisos/departamentos');
@@ -166,8 +241,8 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       await recargaTrasGuardar();
     });
 
-    it('renombrar conserva el estado; desactivar con personal muestra el motivo; activar', async () => {
-      await clic(fixture, boton(filaDe(1, 'SOPORTE'), 'Renombrar'));
+    it('editar conserva el estado; desactivar con personal muestra el motivo; activar', async () => {
+      await clic(fixture, boton(filaDe(1, 'SOPORTE'), 'Editar'));
       expect(campo<HTMLInputElement>(modal(), '#area-nombre').value).toBe('SOPORTE');
       expect(modal().querySelector('#area-departamento')).toBeNull();
       await escribir(fixture, campo(modal(), '#area-nombre'), 'SOPORTE TECNICO');
@@ -193,36 +268,54 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       await recargaTrasGuardar();
     });
 
-    it('nuevo usuario: valida cada paso, avisa si es de otro departamento y crea', async () => {
+    it('nuevo usuario: orden del formulario, filtros en cascada, validaciones y alta', async () => {
       await clic(fixture, boton(raiz(), 'Nuevo usuario'));
-      // El general no puede crear otro administrador general.
-      expect(opcionesDe(campo(modal(), '#jefe-nivel'))).not.toContain('Administrador general');
-      await enviar(fixture, formulario());
-      expect(alerta()).toBe('Selecciona al empleado.');
-
-      await elegir(fixture, campo(modal(), '#jefe-area-filtro'), 'Sin área');
-      expect(opcionesDe(campo(modal(), '#jefe-empleado'))).toEqual(['Selecciona al empleado', 'PEDRO SIN AREA']);
-      await elegir(fixture, campo(modal(), '#jefe-area-filtro'), 'Todas las áreas');
-      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'ANA LOPEZ');
-      await enviar(fixture, formulario());
-      expect(alerta()).toBe('Escribe el usuario.');
-
-      await escribir(fixture, campo(modal(), '#jefe-usuario'), '  ana.lopez ');
-      // Se propone su departamento y su área.
-      expect(campo<HTMLSelectElement>(modal(), '#jefe-area').selectedOptions[0].textContent!.trim()).toBe('SOPORTE');
-      await elegir(fixture, campo(modal(), '#jefe-departamento'), 'RECURSOS HUMANOS');
-      expect(texto()).toContain('ANA LOPEZ es empleado de INFORMATICA; con este nivel verá al personal de RECURSOS HUMANOS.');
+      const seleccionado = (id: string): string => campo<HTMLSelectElement>(modal(), id).selectedOptions[0].textContent!.trim();
+      // Los campos del formulario (sin los cuadros de búsqueda de las listas largas).
+      expect(Array.from(modal().querySelectorAll('select[id^="jefe-"], input[id^="jefe-"]')).map((item) => item.id)).toEqual([
+        'jefe-cuenta', 'jefe-dominio', 'jefe-nivel', 'jefe-departamento', 'jefe-area', 'jefe-empleado', 'jefe-usuario',
+      ]);
+      // El dominio solo se elige en la cuenta de dominio.
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-dominio').disabled).toBe(true);
+      await elegir(fixture, campo(modal(), '#jefe-cuenta'), 'Usuario de dominio');
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-dominio').disabled).toBe(false);
+      await elegir(fixture, campo(modal(), '#jefe-cuenta'), 'Usuario local');
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-dominio').disabled).toBe(true);
+      // El general puede crear otros administradores generales.
+      expect(opcionesDe(campo(modal(), '#jefe-nivel'))).toContain('Administrador general');
       await enviar(fixture, formulario());
       expect(alerta()).toBe('Selecciona el departamento y el área del jefe.');
 
-      await elegir(fixture, campo(modal(), '#jefe-area'), 'NOMINA');
+      // Solo los departamentos habilitados en el sistema; el departamento deja solo su personal.
+      expect(opcionesDe(campo(modal(), '#jefe-departamento'))).toEqual(['Selecciona el departamento', 'INFORMATICA', 'RECURSOS HUMANOS']);
+      await elegir(fixture, campo(modal(), '#jefe-departamento'), 'RECURSOS HUMANOS');
+      expect(opcionesDe(campo(modal(), '#jefe-empleado'))).toEqual(['Selecciona al empleado', 'MARIA RUIZ']);
+
+      // Con un área se ven su personal y el del departamento sin área.
+      await elegir(fixture, campo(modal(), '#jefe-departamento'), 'INFORMATICA');
+      expect(opcionesDe(campo(modal(), '#jefe-empleado'))).toEqual(['Selecciona al empleado', 'ANA LOPEZ', 'LUIS PAZ', 'PEDRO SIN AREA']);
+      await elegir(fixture, campo(modal(), '#jefe-area'), 'SOPORTE');
+      expect(opcionesDe(campo(modal(), '#jefe-empleado'))).toEqual(['Selecciona al empleado', 'ANA LOPEZ', 'PEDRO SIN AREA']);
+      await enviar(fixture, formulario());
+      expect(alerta()).toBe('Selecciona al empleado.');
+
+      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'ANA LOPEZ');
+      await enviar(fixture, formulario());
+      expect(alerta()).toBe('Escribe el usuario.');
+      // Otra área quita al empleado que ya no está en la lista.
+      await elegir(fixture, campo(modal(), '#jefe-area'), 'DESARROLLO');
+      expect(seleccionado('#jefe-empleado')).toBe('Selecciona al empleado');
+      await elegir(fixture, campo(modal(), '#jefe-area'), 'SOPORTE');
+      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'ANA LOPEZ');
+
+      await escribir(fixture, campo(modal(), '#jefe-usuario'), '  ana.lopez ');
       await elegir(fixture, campo(modal(), '#jefe-cuenta'), 'Usuario de dominio');
       await elegir(fixture, campo(modal(), '#jefe-dominio'), 'HRN');
       await enviar(fixture, formulario());
       const crear = llamada(http, 'POST', '/permisos/jefes');
       expect(crear.request.body).toEqual({
-        Usuario: 'ana.lopez', NombrePersona: 'ANA LOPEZ', Nivel: 'JEFE', IdDepartamento: null, IdArea: 200,
-        Dominio: 1, DominioP: 'HRN', Estado: null,
+        Usuario: 'ana.lopez', NombrePersona: 'ANA LOPEZ', Nivel: 'JEFE', IdDepartamento: null, IdArea: 100,
+        Dominio: 1, DominioP: 'HRN', Estado: null, IdEmpleado: null,
       });
       errorApi(crear, 400, 'Ya existe un usuario con ese nombre.');
       await actualizar(fixture);
@@ -235,11 +328,16 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       await recargaTrasGuardar();
     });
 
-    it('nuevo administrador de departamento y nuevo usuario de consulta', async () => {
+    it('nuevo jefe de departamento; la consulta ya no se ofrece', async () => {
       await clic(fixture, boton(raiz(), 'Nuevo usuario'));
+      expect(opcionesDe(campo(modal(), '#jefe-nivel')))
+        .toEqual(['Usuario (empleado)', 'Jefe de área', 'Secretaría de departamento', 'Jefe de departamento', 'Administrador general']);
+      // Sin departamento ni área elegidos, el empleado los completa.
       await elegir(fixture, campo(modal(), '#jefe-empleado'), 'LUIS PAZ');
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-departamento').selectedOptions[0].textContent!.trim()).toBe('INFORMATICA');
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-area').selectedOptions[0].textContent!.trim()).toBe('DESARROLLO');
       await escribir(fixture, campo(modal(), '#jefe-usuario'), 'luis.paz');
-      await elegir(fixture, campo(modal(), '#jefe-nivel'), 'Administrador de departamento');
+      await elegir(fixture, campo(modal(), '#jefe-nivel'), 'Jefe de departamento');
       expect(texto()).toContain('Ve su departamento y administra sus áreas');
       await elegir(fixture, campo(modal(), '#jefe-departamento'), 'Selecciona el departamento');
       await enviar(fixture, formulario());
@@ -249,9 +347,20 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       expect(llamada(http, 'POST', '/permisos/jefes').request.body).toMatchObject({ Nivel: 'ADMIN_DEPTO', IdDepartamento: 10, IdArea: null });
     });
 
+    it('nuevo administrador general: sin departamento ni área', async () => {
+      await clic(fixture, boton(raiz(), 'Nuevo usuario'));
+      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'LUIS PAZ');
+      await escribir(fixture, campo(modal(), '#jefe-usuario'), 'luis.paz');
+      await elegir(fixture, campo(modal(), '#jefe-nivel'), 'Administrador general');
+      expect(texto()).toContain('Ve todos los departamentos y administra departamentos, áreas y usuarios.');
+      expect(texto()).toContain('El departamento y el área solo sirven para buscar al empleado.');
+      await enviar(fixture, formulario());
+      expect(llamada(http, 'POST', '/permisos/jefes').request.body).toMatchObject({ Nivel: 'ADMIN', IdDepartamento: null, IdArea: null });
+    });
+
     it('editar usuario local: estado, paso a local y su aviso', async () => {
       await clic(fixture, boton(filaDe(2, 'JEFE DOMINIO'), 'Editar'));
-      expect(texto()).toContain('EDITAR USUARIO');
+      expect(texto()).toContain('Editar usuario');
       expect(modal().querySelector('#jefe-empleado')).toBeNull();
       await elegir(fixture, campo(modal(), '#jefe-cuenta'), 'Usuario local');
       await elegir(fixture, campo(modal(), '#jefe-estado'), 'Inactivo');
@@ -289,59 +398,46 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       await recargaTrasGuardar();
     });
 
-    it('cuenta de inventario: editar su acceso y quitarlo', async () => {
-      await clic(fixture, boton(filaDe(2, 'JEFE NOMINA'), 'Editar acceso'));
-      expect(texto()).toContain('CUENTA DE INVENTARIO');
-      expect(texto()).toContain('Cuenta: inventario.rrhh');
-      await elegir(fixture, campo(modal(), '#acceso-nivel'), 'Consulta');
+    it('eliminar un usuario pide confirmación; cancelar no llama a la API', async () => {
+      // En la fila propia no se ofrece eliminar.
+      expect(botones(filaDe(2, 'ADMINISTRADOR'), 'Eliminar')).toHaveLength(0);
+      expect(botones(filaDe(2, 'ADMINISTRADOR'), 'Editar')).toHaveLength(1);
+
+      await clic(fixture, boton(filaDe(2, 'JEFE SOPORTE'), 'Eliminar'));
+      expect(modal().textContent).toContain('Eliminar usuario');
+      expect(modal().textContent).toContain('JEFE SOPORTE');
+      await clic(fixture, boton(modal(), 'Cancelar'));
+      expect(raiz().querySelector('.workshop-modal')).toBeNull();
+      http.expectNone((request) => request.method === 'DELETE');
+
+      await clic(fixture, boton(filaDe(2, 'JEFE NOMINA'), 'Eliminar'));
+      await enviar(fixture, formulario());
+      errorApi(llamada(http, 'DELETE', '/permisos/jefes/53'), 404, 'No se encontró el usuario indicado o no lo administras.');
+      await actualizar(fixture);
+      expect(alerta()).toContain('no lo administras');
+      await clic(fixture, boton(modal(), 'Cerrar ventana'));
+
+      await clic(fixture, boton(filaDe(2, 'JEFE SOPORTE'), 'Eliminar'));
+      await enviar(fixture, formulario());
+      llamada(http, 'DELETE', '/permisos/jefes/51').flush(null, ok);
+      await actualizar(fixture);
+      expect(raiz().querySelector('.workshop-modal')).toBeNull();
+      expect(texto()).toMatch(/Usuario \S+ eliminado\./);
+      await recargaTrasGuardar();
+    });
+
+    it('editar un usuario: cambia su nivel a jefe de departamento', async () => {
+      await clic(fixture, boton(filaDe(2, 'JEFE NOMINA'), 'Editar'));
+      expect(campo<HTMLInputElement>(modal(), '#jefe-usuario').value).toBe('jefe.nomina');
+      await elegir(fixture, campo(modal(), '#jefe-nivel'), 'Jefe de departamento');
+      await elegir(fixture, campo(modal(), '#jefe-departamento'), 'INFORMATICA');
       await enviar(fixture, formulario());
       const guardar = llamada(http, 'PUT', '/permisos/jefes/53');
-      expect(guardar.request.body).toMatchObject({ Nivel: 'CONSULTA', IdArea: null, IdDepartamento: null });
+      expect(guardar.request.body).toMatchObject({ Usuario: 'jefe.nomina', Nivel: 'ADMIN_DEPTO', IdArea: null, IdDepartamento: 10 });
       guardar.flush(null, ok);
       await actualizar(fixture);
-      expect(texto()).toContain('Acceso actualizado.');
+      expect(texto()).toContain('Usuario actualizado.');
       await recargaTrasGuardar();
-
-      await clic(fixture, boton(filaDe(2, 'JEFE NOMINA'), 'Quitar acceso'));
-      errorApi(llamada(http, 'DELETE', '/permisos/jefes/53/acceso'), 0);
-      await actualizar(fixture);
-      expect(alerta()).toBe('No se pudieron guardar los cambios.');
-      await clic(fixture, boton(filaDe(2, 'JEFE NOMINA'), 'Quitar acceso'));
-      llamada(http, 'DELETE', '/permisos/jefes/53/acceso').flush(null, ok);
-      await actualizar(fixture);
-      expect(texto()).toContain('JEFE NOMINA ya no tiene acceso al control de permisos.');
-      await recargaTrasGuardar();
-    });
-
-    it('dar acceso a una cuenta de inventario: elegir cuenta y nivel', async () => {
-      await clic(fixture, boton(raiz(), 'Dar acceso a usuario de inventario'));
-      llamada(http, 'GET', '/permisos/usuarios-inventario').flush([
-        { IdUsuario: 70, Usuario: 'carlos.inv', NombrePersona: 'CARLOS INVENTARIO' },
-      ]);
-      await actualizar(fixture);
-      await enviar(fixture, formulario());
-      expect(alerta()).toBe('Selecciona la cuenta de inventario.');
-
-      await elegir(fixture, campo(modal(), '#acceso-usuario'), 'CARLOS INVENTARIO');
-      await enviar(fixture, formulario());
-      expect(alerta()).toBe('Selecciona el departamento y el área del jefe.');
-
-      await elegir(fixture, campo(modal(), '#acceso-departamento'), 'INFORMATICA');
-      await elegir(fixture, campo(modal(), '#acceso-area'), 'DESARROLLO');
-      await enviar(fixture, formulario());
-      const guardar = llamada(http, 'PUT', '/permisos/jefes/70');
-      expect(guardar.request.body).toMatchObject({ Usuario: 'carlos.inv', NombrePersona: 'CARLOS INVENTARIO', Nivel: 'JEFE', IdArea: 101 });
-      guardar.flush(null, ok);
-      await actualizar(fixture);
-      expect(texto()).toContain('CARLOS INVENTARIO ya puede entrar al control de permisos con su misma cuenta.');
-      await recargaTrasGuardar();
-    });
-
-    it('si no se pueden cargar las cuentas de inventario lo dice', async () => {
-      await clic(fixture, boton(raiz(), 'Dar acceso a usuario de inventario'));
-      errorApi(llamada(http, 'GET', '/permisos/usuarios-inventario'), 500);
-      await actualizar(fixture);
-      expect(alerta()).toBe('No se pudieron cargar las cuentas de inventario.');
     });
   });
 
@@ -350,7 +446,7 @@ describe('Sección de departamentos, áreas y usuarios', () => {
 
     it('no maneja departamentos y solo administra a los jefes de su departamento', async () => {
       expect(botones(raiz(), 'Agregar departamento')).toHaveLength(0);
-      expect(texto()).toContain('Jefes de área');
+      expect(texto()).toContain('Usuarios de mi departamento');
       expect(botones(filaDe(1, 'JEFE SOPORTE'), 'Editar')).toHaveLength(1);
       expect(filaDe(1, 'ADMIN RRHH').textContent).toContain('Solo el administrador general');
       expect(filaDe(1, 'JEFE NOMINA').textContent).toContain('Solo el administrador general');
@@ -365,39 +461,22 @@ describe('Sección de departamentos, áreas y usuarios', () => {
       expect(llamada(http, 'POST', '/permisos/areas').request.body).toEqual({ Nombre: 'REDES', Estado: null, IdDepartamento: 10 });
     });
 
-    it('solo nombra jefes', async () => {
+    it('nombra jefes de sus áreas y la secretaría de su departamento', async () => {
       await clic(fixture, boton(raiz(), 'Nuevo usuario'));
-      expect(modal().querySelector('#jefe-nivel')).toBeNull();
-      expect(texto()).toContain('Departamento');
-    });
+      expect(opcionesDe(campo(modal(), '#jefe-nivel')))
+        .toEqual(['Usuario (empleado)', 'Jefe de área', 'Secretaría de departamento']);
+      // Con un solo departamento ya va en el suyo.
+      expect(campo<HTMLSelectElement>(modal(), '#jefe-departamento').selectedOptions[0].textContent!.trim()).toBe('INFORMATICA');
 
-    it('dar acceso: busca la cuenta por su usuario exacto', async () => {
-      await clic(fixture, boton(raiz(), 'Dar acceso a usuario de inventario'));
-      sinLlamadas(http, 'GET', '/permisos/usuarios-inventario');
-      await clic(fixture, boton(modal(), 'Buscar'));
-      expect(alerta()).toBe('Escribe el usuario de la cuenta de inventario.');
-
-      await escribir(fixture, campo(modal(), '#acceso-busqueda'), 'no.existe');
-      await clic(fixture, boton(modal(), 'Buscar'));
-      const buscar = llamada(http, 'GET', '/permisos/usuarios-inventario');
-      expect(buscar.request.params.get('usuario')).toBe('no.existe');
-      buscar.flush([]);
-      await actualizar(fixture);
-      expect(alerta()).toBe('No hay una cuenta de inventario activa sin acceso a permisos con ese usuario.');
-
-      await escribir(fixture, campo(modal(), '#acceso-busqueda'), 'carlos.inv');
-      await clic(fixture, boton(modal(), 'Buscar'));
-      errorApi(llamada(http, 'GET', '/permisos/usuarios-inventario'), 400, 'Escribe el usuario de la cuenta de inventario.');
-      await actualizar(fixture);
-      expect(alerta()).toBe('Escribe el usuario de la cuenta de inventario.');
-
-      await clic(fixture, boton(modal(), 'Buscar'));
-      llamada(http, 'GET', '/permisos/usuarios-inventario').flush([{ IdUsuario: 70, Usuario: 'carlos.inv', NombrePersona: 'CARLOS INVENTARIO' }]);
-      await actualizar(fixture);
-      expect(texto()).toContain('Cuenta: CARLOS INVENTARIO · carlos.inv');
-      await elegir(fixture, campo(modal(), '#acceso-area'), 'SOPORTE');
+      await elegir(fixture, campo(modal(), '#jefe-empleado'), 'LUIS PAZ');
+      await escribir(fixture, campo(modal(), '#jefe-usuario'), 'luis.paz');
+      await elegir(fixture, campo(modal(), '#jefe-nivel'), 'Secretaría de departamento');
+      expect(texto()).toContain('Ve todas las áreas de su departamento y saca sus reportes y memorandos');
       await enviar(fixture, formulario());
-      expect(llamada(http, 'PUT', '/permisos/jefes/70').request.body).toMatchObject({ Nivel: 'JEFE', IdArea: 100 });
+      // El área solo sirvió para buscar al empleado: la secretaría va al departamento.
+      expect(llamada(http, 'POST', '/permisos/jefes').request.body)
+        .toMatchObject({ Nivel: 'SECRETARIA', IdDepartamento: 10, IdArea: null });
     });
+
   });
 });

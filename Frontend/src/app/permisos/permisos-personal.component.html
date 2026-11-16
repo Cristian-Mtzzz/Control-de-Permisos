@@ -7,7 +7,7 @@
 <section class="workshop-section">
   <div class="workshop-actions">
     <div>
-      <p class="eyebrow">ÁREA DE {{ sesion().NombreArea?.toUpperCase() }}</p>
+      <p class="eyebrow">Área de {{ sesion().NombreArea }}</p>
       <h2>Mi personal · {{ miPersonal.length }}</h2>
     </div>
   </div>
@@ -28,21 +28,28 @@
     Solo aparecen los empleados activos de tu departamento que todavía no pertenecen a ningún área. Si
     alguien está en otra área, el administrador de tu departamento puede moverlo.
   </p>
+  <p class="field-hint">Para cambiar el No. de pago, escríbelo en la tabla y presiona Enter. Esc deshace lo escrito.</p>
 
   <div class="table-wrap">
     <table class="resumen-table">
       <thead>
         <tr>
-          <th>EMPLEADO</th>
-          <th>NO. DE PAGO</th>
-          <th>ACCIONES</th>
+          <th>Empleado</th>
+          <th>No. de pago</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
         @for (empleado of miPersonal; track empleado.IdEmpleado) {
         <tr>
           <td>{{ empleado.NombreCompleto }}</td>
-          <td>{{ empleado.NoPago || '-' }}</td>
+          <td>
+            <input #noPago type="text" class="row-input" inputmode="numeric" maxlength="15" autocomplete="off"
+              [value]="empleado.NoPago ?? ''" [disabled]="isSaving" placeholder="Sin No. de pago"
+              (keydown.enter)="$event.preventDefault(); guardarNoPago(empleado, noPago)"
+              (keydown.escape)="deshacerNoPago(empleado, noPago)"
+              [attr.aria-label]="'No. de pago de ' + empleado.NombreCompleto" />
+          </td>
           <td><button type="button" class="danger" (click)="quitar(empleado)" [disabled]="isSaving">Quitar del área</button></td>
         </tr>
         } @empty {
@@ -57,7 +64,7 @@
 <section class="workshop-section">
   <div class="workshop-actions">
     <div>
-      <p class="eyebrow">{{ sesion().Nivel === 'ADMIN_DEPTO' ? sesion().NombreDepartamento?.toUpperCase() : 'PERSONAL' }}</p>
+      @if (sesion().Nivel === 'ADMIN_DEPTO') { <p class="eyebrow">{{ sesion().NombreDepartamento }}</p> }
       <h2>Empleados por área</h2>
     </div>
   </div>
@@ -66,39 +73,46 @@
     <input type="search" class="permisos-search" [(ngModel)]="searchTerm" (ngModelChange)="updateFilter()"
       name="personalSearch" placeholder="Buscar por nombre o No. de pago" aria-label="Buscar empleados" />
     @if (variosDepartamentos) {
-    <select nativeSelect [(ngModel)]="deptoFilter" (ngModelChange)="updateDepto()" name="personalDepto" aria-label="Departamento">
+    <select sinBusqueda [(ngModel)]="deptoFilter" (ngModelChange)="updateDepto()" name="personalDepto" aria-label="Departamento">
       <option [ngValue]="0">Todos los departamentos</option>
       @for (departamento of sesion().Departamentos; track departamento.IdDepartamento) {
       <option [ngValue]="departamento.IdDepartamento">{{ departamento.Nombre }}</option>
       }
     </select>
     }
-    <select nativeSelect [(ngModel)]="areaFilter" (ngModelChange)="updateFilter()" name="personalArea" aria-label="Área">
+    <select sinBusqueda [(ngModel)]="areaFilter" (ngModelChange)="updateFilter()" name="personalArea" aria-label="Área">
       <option [ngValue]="0">Todas las áreas</option>
       <option [ngValue]="sinArea">Sin área</option>
       @for (area of areasFiltro; track area.IdArea) { <option [ngValue]="area.IdArea">{{ area.Nombre }}</option> }
     </select>
     <app-table-page-size [(page)]="page" [(pageSize)]="pageSize" />
   </div>
+  <p class="field-hint">Para cambiar el No. de pago, escríbelo en la tabla y presiona Enter. Esc deshace lo escrito.</p>
 
   <div class="table-wrap">
     <table class="resumen-table">
       <thead>
         <tr>
-          <th>EMPLEADO</th>
-          <th>NO. DE PAGO</th>
-          @if (variosDepartamentos) { <th>DEPARTAMENTO</th> }
-          <th>ÁREA</th>
+          <th>Empleado</th>
+          <th>No. de pago</th>
+          @if (variosDepartamentos) { <th>Departamento</th> }
+          <th>Área</th>
         </tr>
       </thead>
       <tbody>
         @for (empleado of filtrados | page: page : pageSize; track empleado.IdEmpleado) {
         <tr>
           <td>{{ empleado.NombreCompleto }}</td>
-          <td>{{ empleado.NoPago || '-' }}</td>
+          <td>
+            <input #noPago type="text" class="row-input" inputmode="numeric" maxlength="15" autocomplete="off"
+              [value]="empleado.NoPago ?? ''" [disabled]="isSaving" placeholder="Sin No. de pago"
+              (keydown.enter)="$event.preventDefault(); guardarNoPago(empleado, noPago)"
+              (keydown.escape)="deshacerNoPago(empleado, noPago)"
+              [attr.aria-label]="'No. de pago de ' + empleado.NombreCompleto" />
+          </td>
           @if (variosDepartamentos) { <td>{{ departamentoNombre(empleado.IdDepartamento) }}</td> }
           <td>
-            <select nativeSelect class="row-select" [ngModel]="empleado.IdArea ?? 0"
+            <select sinBusqueda class="row-select" [ngModel]="empleado.IdArea ?? 0"
               (ngModelChange)="cambiarArea(empleado, $event)" [disabled]="isSaving"
               [attr.aria-label]="'Área de ' + empleado.NombreCompleto">
               <option [ngValue]="0">Sin área</option>

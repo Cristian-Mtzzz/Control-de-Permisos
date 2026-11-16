@@ -13,9 +13,9 @@ using ControlPermisos.Api.Models;
 
 namespace ControlPermisos.Api.Services;
 
-// Servicio de autenticación: valida las credenciales contra USUARIOS (la misma tabla del
-// inventario, así cada persona entra con su misma cuenta) o contra Active Directory, exige un
-// nivel vigente en el Control de permisos y crea el JWT que el frontend usa para la sesión.
+// Servicio de autenticación: valida las credenciales contra USUARIOS_PERMISOS (los usuarios
+// propios de este sistema, aparte de USUARIOS del inventario) o contra Active Directory, exige
+// un nivel vigente en el Control de permisos y crea el JWT que el frontend usa para la sesión.
 public sealed class AuthService(
     PermisosDbContext dbContext,
     IPermisoAreaService areaService,
@@ -61,9 +61,9 @@ public sealed class AuthService(
             // sin distinguir mayúsculas ni espacios y aceptando "usuario", "DOMINIO\usuario" o "usuario@dominio".
             await using var command = CreateCommand(connection, null, """
                 SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA, PASSWORD_HASH, DOMINIOP, DOMINIO, CLAVE_SEGURA
-                FROM USUARIOS
+                FROM USUARIOS_PERMISOS
                 WHERE (USUARIO = :userName OR (DOMINIO = 1 AND LOWER(TRIM(USUARIO)) = :domainUserName))
-                  AND UPPER(ESTADO) = 'ACTIVO'
+                  AND ESTADO = 'ACTIVO'
                   AND (FECHA_EXPIRACION IS NULL OR FECHA_EXPIRACION >= TRUNC(SYSDATE))
                 ORDER BY CASE WHEN USUARIO = :exactUserName THEN 0 ELSE 1 END
                 """,
@@ -175,7 +175,7 @@ public sealed class AuthService(
     }
 
     // Valida la contraseña de un usuario local. Si todavía tiene el hash antiguo de ORA_HASH y la
-    // contraseña es correcta, lo reemplaza por BCrypt (igual que el inventario, con la misma tabla).
+    // contraseña es correcta, lo reemplaza por BCrypt (igual que el inventario).
     private async Task<bool> VerifyLocalPassword(
         DbConnection connection,
         User user,
@@ -195,7 +195,7 @@ public sealed class AuthService(
         try
         {
             await Execute(connection, null, """
-                UPDATE USUARIOS
+                UPDATE USUARIOS_PERMISOS
                 SET PASSWORD_HASH = :newHash
                 WHERE ID_USUARIO = :userId
                   AND PASSWORD_HASH = :oldHash
@@ -218,7 +218,7 @@ public sealed class AuthService(
         string password,
         CancellationToken cancellationToken) =>
         await GetScalar<int>(connection, null, """
-            SELECT COUNT(*) FROM USUARIOS
+            SELECT COUNT(*) FROM USUARIOS_PERMISOS
             WHERE ID_USUARIO = :userId
               AND PASSWORD_HASH = ORA_HASH(:password, 4294967295) || ORA_HASH(USUARIO, 4294967295)
             """, cancellationToken, ("userId", userId), ("password", password)) == 1;
@@ -234,7 +234,7 @@ public sealed class AuthService(
         {
             string currentHash;
             await using (var select = CreateCommand(connection, null, """
-                SELECT PASSWORD_HASH FROM USUARIOS
+                SELECT PASSWORD_HASH FROM USUARIOS_PERMISOS
                 WHERE ID_USUARIO = :userId
                   AND DOMINIO = 0
                   AND CLAVE_SEGURA = '0'
@@ -251,7 +251,7 @@ public sealed class AuthService(
             if (!currentIsValid) return false;
 
             return await Execute(connection, null, """
-                UPDATE USUARIOS
+                UPDATE USUARIOS_PERMISOS
                 SET PASSWORD_HASH = :newHash,
                     CLAVE_SEGURA = '1'
                 WHERE ID_USUARIO = :userId
@@ -287,9 +287,9 @@ public sealed class AuthService(
         {
             await using var command = CreateCommand(connection, null, """
                 SELECT ID_USUARIO, USUARIO, NOMBRE_PERSONA, DOMINIO, CLAVE_SEGURA
-                FROM USUARIOS
+                FROM USUARIOS_PERMISOS
                 WHERE ID_USUARIO = :userId
-                  AND UPPER(ESTADO) = 'ACTIVO'
+                  AND ESTADO = 'ACTIVO'
                   AND (FECHA_EXPIRACION IS NULL OR FECHA_EXPIRACION >= TRUNC(SYSDATE))
                 """, ("userId", userId));
             await using var reader = await command.ExecuteReaderAsync(cancellationToken);

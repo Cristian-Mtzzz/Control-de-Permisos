@@ -1,16 +1,19 @@
-<!-- Pantalla pública del login. -->
+<!-- Pantalla pública del login: el instituto a la izquierda y el formulario a la derecha. -->
 <main class="auth-shell">
-  <header class="app-header">
-    <!-- Logo del ihss. -->
-    <img class="brand-logo" src="logo-login.png" alt="Gobierno de la República de Honduras · IHSS" />
-    <span class="header-title">Control de Permisos</span>
-  </header>
-  
+  <section class="auth-brand">
+    <!-- ?v= obliga al navegador a descargar el logo de nuevo cuando cambia. -->
+    <img class="brand-logo" src="logo-login.png?v=2" alt="IHSS · Instituto Hondureño de Seguridad Social" />
+    <div class="brand-copy">
+      <h1>Control de permisos</h1>
+      <p>Registro y seguimiento de los permisos del personal, por departamento y área.</p>
+    </div>
+    <small>Instituto Hondureño de Seguridad Social</small>
+  </section>
+
   <section class="form-panel">
     <div class="form-wrap">
-      <p class="eyebrow">BIENVENIDO</p>
       <h2>Inicia sesión</h2>
-      <p class="form-intro">Ingresa tus credenciales.</p>
+      <p class="form-intro">Entra con tu usuario y contraseña.</p>
 
       <form [formGroup]="loginForm" (ngSubmit)="submitLogin()" novalidate>
         <label for="userName">Usuario</label>
@@ -31,12 +34,9 @@
           class="field-error">Ingresa tu contraseña.</small> }
         @if (infoMessage()) { <p class="info-banner" role="status">{{ infoMessage() }}</p> }
         @if (errorMessage()) { <p class="error-banner" role="alert">{{ errorMessage() }}</p> }
-        <button class="submit-button" type="submit" [disabled]="isLoading()"><span>{{ isLoading() ? 'Validando...' :
-            'Ingresar' }}</span>@if (!isLoading()) { <span class="submit-arrow" aria-hidden="true">&rarr;</span>
-          }</button>
+        <button class="submit-button" type="submit" [disabled]="isLoading()">{{ isLoading() ? 'Validando...' : 'Ingresar' }}</button>
       </form>
-      <p class="security-note"><span aria-hidden="true">&#9672;</span> Conexión segura y protegida</p>
     </div>
-    <footer>© 2026 Control de Permisos <span>·</span> Acceso autorizado</footer>
+    <footer>© 2026 IHSS</footer>
   </section>
 </main>

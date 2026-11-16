@@ -45,7 +45,8 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // La cadena de conexión completa está configurada directamente en appsettings.json. Es la misma
-// base del inventario: comparten USUARIOS, EMPLEADOS_IHSS, DEPARTAMENTO_IHSS y LOGIN_CONFIG.
+// base del inventario: comparten EMPLEADOS_IHSS, DEPARTAMENTO_IHSS y LOGIN_CONFIG. Los usuarios
+// de este sistema están aparte, en USUARIOS_PERMISOS.
 var oracleConnection = builder.Configuration.GetConnectionString("OracleConnection");
 if (string.IsNullOrWhiteSpace(oracleConnection))
 {

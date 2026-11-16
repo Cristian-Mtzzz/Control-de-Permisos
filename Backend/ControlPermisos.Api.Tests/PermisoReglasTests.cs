@@ -13,13 +13,14 @@ public sealed class PermisoReglasTests
         decimal? maxDiasPorPermiso = null,
         decimal? maxHorasPorPermiso = null,
         decimal? maxDiasPorAnio = null,
-        decimal? maxHorasPorMes = null) =>
-        new(new TimeOnly(8, 0), new TimeOnly(16, 0), maxDiasPorPermiso, maxHorasPorPermiso, maxDiasPorAnio, maxHorasPorMes);
+        decimal? maxHorasPorMes = null,
+        decimal? maxDiasPorMes = null) =>
+        new(new TimeOnly(8, 0), new TimeOnly(16, 0), maxDiasPorPermiso, maxHorasPorPermiso, maxDiasPorAnio, maxHorasPorMes, maxDiasPorMes);
 
-    private static Solicitud Dia(DateTime inicio, DateTime fin) => new("DIA", 1, "Motivo", inicio, fin, null, null, inicio);
+    private static Solicitud Dia(DateTime inicio, DateTime fin) => new("DIA", 1, "Motivo", inicio, fin, null, null);
 
     private static Solicitud Hora(DateTime fecha, string salida, string entrada) =>
-        new("HORA", 1, "Motivo", fecha, fecha, TimeOnly.Parse(salida), TimeOnly.Parse(entrada), null);
+        new("HORA", 1, "Motivo", fecha, fecha, TimeOnly.Parse(salida), TimeOnly.Parse(entrada));
 
     private static Existente ExistenteDia(DateTime inicio, DateTime fin) => new("DIA", inicio, fin, null, null, 0);
 
@@ -185,6 +186,80 @@ public sealed class PermisoReglasTests
         var nueva = Dia(new DateTime(2026, 12, 28), new DateTime(2027, 1, 8));
         Assert.Contains("en 2027", Falla(() => ValidarLimites(nueva, 10, 0, [], Parametros(maxDiasPorAnio: 5), SinFeriados)));
         ValidarLimites(nueva, 10, 0, [], Parametros(maxDiasPorAnio: 6), SinFeriados);
+    }
+
+    [Fact]
+    public void TopeMensualSumaDiasYHorasHasta2Dias()
+    {
+        var parametros = Parametros(maxDiasPorMes: 2);
+        // 1 día + 8 h (una jornada) = 2 días = 16 horas: justo el tope.
+        var unDiaYOchoHoras = new[] { ExistenteDia(Lunes, Lunes), ExistenteHora(Lunes.AddDays(1), "08:00", "12:00") };
+        ValidarLimites(Hora(Lunes.AddDays(2), "08:00", "12:00"), 0, 240, unDiaYOchoHoras, parametros, SinFeriados);
+
+        // 1 hora más ya se pasa: 2.13 días (17 horas).
+        var mensaje = Falla(() => ValidarLimites(Hora(Lunes.AddDays(2), "08:00", "13:00"), 0, 300, unDiaYOchoHoras, parametros, SinFeriados));
+        Assert.StartsWith("Permiso no permitido porque se pasa del tiempo estipulado", mensaje);
+        Assert.Contains("2 días (16 horas) al mes", mensaje);
+        Assert.Contains("en 10/2026", mensaje);
+
+        // Un permiso de 3 días por sí solo también se pasa.
+        Assert.StartsWith("Permiso no permitido", Falla(() => ValidarLimites(Dia(Lunes, Lunes.AddDays(2)), 3, 0, [], parametros, SinFeriados)));
+    }
+
+    [Fact]
+    public void TopeMensualCuentaCadaMesPorSeparado()
+    {
+        var parametros = Parametros(maxDiasPorMes: 2);
+        // 2 días en octubre no impiden 2 días en noviembre.
+        var octubre = new[] { ExistenteDia(Lunes, Lunes.AddDays(1)) };
+        ValidarLimites(Dia(new DateTime(2026, 11, 2), new DateTime(2026, 11, 3)), 2, 0, octubre, parametros, SinFeriados);
+
+        // Del jueves 29/10 al martes 03/11: 2 días hábiles en octubre y 2 en noviembre, cada mes en su tope.
+        ValidarLimites(Dia(new DateTime(2026, 10, 29), new DateTime(2026, 11, 3)), 4, 0, [], parametros, SinFeriados);
+        // Pero con 1 día ya usado en noviembre, noviembre se pasa.
+        var noviembre = new[] { ExistenteDia(new DateTime(2026, 11, 10), new DateTime(2026, 11, 10)) };
+        Assert.Contains("en 11/2026", Falla(() => ValidarLimites(Dia(new DateTime(2026, 10, 29), new DateTime(2026, 11, 3)), 4, 0, noviembre, parametros, SinFeriados)));
+    }
+
+    // ---- Vacaciones ----------------------------------------------------------------------
+
+    private static Solicitud Vacaciones(DateTime inicio, DateTime fin) =>
+        new("VAC", 1, "VACACIONES", inicio, fin, null, null, Lunes.AddDays(-10));
+
+    private static Existente ExistenteVacaciones(DateTime inicio, DateTime fin) => new("VAC", inicio, fin, null, null, 0);
+
+    [Fact]
+    public void VacacionesCuentanDiasHabiles()
+    {
+        var feriados = new HashSet<DateTime> { Lunes.AddDays(2) };
+        Assert.Equal((4, 0), Calcular(Vacaciones(Lunes, Lunes.AddDays(6)), Parametros(), feriados));
+        Assert.Contains("no tiene días hábiles", Falla(() => Calcular(Vacaciones(Lunes.AddDays(5), Lunes.AddDays(6)), Parametros(), SinFeriados)));
+    }
+
+    [Fact]
+    public void VacacionesChocanConPermisosYConOtrasVacaciones()
+    {
+        var vacaciones = Vacaciones(Lunes, Lunes.AddDays(4));
+        Assert.Contains("un permiso por día el 28/10/2026 que se cruza con estas vacaciones",
+            Falla(() => ValidarChoques(vacaciones, [ExistenteDia(Lunes.AddDays(2), Lunes.AddDays(2))])));
+        Assert.Contains("un permiso por hora", Falla(() => ValidarChoques(vacaciones, [ExistenteHora(Lunes.AddDays(3), "08:00", "09:00")])));
+        Assert.Contains("vacaciones del 30/10/2026 al 03/11/2026 que se cruza con estas vacaciones",
+            Falla(() => ValidarChoques(vacaciones, [ExistenteVacaciones(Lunes.AddDays(4), Lunes.AddDays(8))])));
+        // Un permiso dentro de unas vacaciones tampoco se puede registrar.
+        Assert.Contains("vacaciones del 26/10/2026 al 30/10/2026 que se cruza con este permiso",
+            Falla(() => ValidarChoques(Hora(Lunes.AddDays(1), "10:00", "11:00"), [ExistenteVacaciones(Lunes, Lunes.AddDays(4))])));
+        // Seguidas no chocan.
+        ValidarChoques(vacaciones, [ExistenteVacaciones(Lunes.AddDays(7), Lunes.AddDays(11))]);
+    }
+
+    [Fact]
+    public void VacacionesNoTienenLimitesNiSumanEnLosDePermisos()
+    {
+        var parametros = Parametros(maxDiasPorPermiso: 1, maxDiasPorAnio: 2, maxDiasPorMes: 2);
+        ValidarLimites(Vacaciones(Lunes, Lunes.AddDays(11)), 10, 0, [], parametros, SinFeriados);
+        // Con 10 días de vacaciones en el mes, un permiso de 1 día sigue cabiendo en el tope.
+        var conVacaciones = new[] { ExistenteVacaciones(new DateTime(2026, 10, 12), new DateTime(2026, 10, 23)) };
+        ValidarLimites(Dia(Lunes, Lunes), 1, 0, conVacaciones, parametros, SinFeriados);
     }
 
     // ---- Finalizado ----------------------------------------------------------------------

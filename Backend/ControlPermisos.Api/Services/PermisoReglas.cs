@@ -8,10 +8,11 @@ namespace ControlPermisos.Api.Services;
 // activos del empleado, los parámetros de su departamento y los feriados ya leídos.
 internal static class PermisoReglas
 {
-    // Días hábiles del permiso por día o minutos del permiso por hora, con sus reglas de forma.
+    // Días hábiles del permiso por día y de las vacaciones, o minutos del permiso por hora, con sus
+    // reglas de forma.
     public static (int Dias, int Minutos) Calcular(Solicitud nueva, PermisoParametros parametros, IReadOnlySet<DateTime> feriados)
     {
-        if (nueva.Tipo == PermisoValores.TipoDia)
+        if (EsRango(nueva.Tipo))
         {
             if (nueva.FechaFin < nueva.FechaInicio)
             {
@@ -42,24 +43,25 @@ internal static class PermisoReglas
         }
         if (entrada <= salida)
         {
-            throw new ArgumentException("La hora de entrada debe ser posterior a la hora de salida.");
+            throw new ArgumentException("La hora de regreso debe ser posterior a la hora de salida.");
         }
 
         return (0, (int)(entrada - salida).TotalMinutes);
     }
 
-    // Un empleado no puede tener dos permisos activos que se crucen en fecha u horario.
+    // Un empleado no puede tener dos permisos o vacaciones activos que se crucen en fecha u
+    // horario. El permiso por día y las vacaciones ocupan días completos.
     public static void ValidarChoques(Solicitud nueva, IEnumerable<Existente> existentes)
     {
         foreach (var existente in existentes)
         {
-            var choca = (nueva.Tipo, existente.Tipo) switch
+            var choca = (EsRango(nueva.Tipo), EsRango(existente.Tipo)) switch
             {
-                (PermisoValores.TipoDia, PermisoValores.TipoDia) =>
+                (true, true) =>
                     existente.FechaInicio <= nueva.FechaFin && existente.FechaFin >= nueva.FechaInicio,
-                (PermisoValores.TipoDia, _) =>
+                (true, false) =>
                     existente.FechaInicio >= nueva.FechaInicio && existente.FechaInicio <= nueva.FechaFin,
-                (_, PermisoValores.TipoDia) =>
+                (false, true) =>
                     nueva.FechaInicio >= existente.FechaInicio && nueva.FechaInicio <= existente.FechaFin,
                 _ => existente.FechaInicio == nueva.FechaInicio
                     && existente.HoraSalida < nueva.HoraEntrada
@@ -67,21 +69,29 @@ internal static class PermisoReglas
             };
             if (choca)
             {
-                throw new ArgumentException($"El empleado ya tiene {Describir(existente)} que se cruza con este permiso.");
+                var esta = nueva.Tipo == PermisoValores.TipoVacaciones ? "estas vacaciones" : "este permiso";
+                throw new ArgumentException($"El empleado ya tiene {Describir(existente)} que se cruza con {esta}.");
             }
         }
     }
 
+    // El permiso por día y las vacaciones son un rango de días; el permiso por hora, una franja de un día.
+    public static bool EsRango(string tipo) => tipo != PermisoValores.TipoHora;
+
     // Límites del departamento (PERMISO_PARAMETRO o PERMISO_PARAMETRO_DEPTO); los vacíos no se
-    // aplican. Las horas cuentan como días: una jornada completa equivale a 1 día.
+    // aplican. Las horas cuentan como días: una jornada completa equivale a 1 día. Son límites de
+    // permisos: las vacaciones no los tienen ni suman en ellos.
     public static void ValidarLimites(
         Solicitud nueva,
         int dias,
         int minutos,
-        IReadOnlyCollection<Existente> existentes,
+        IReadOnlyCollection<Existente> todos,
         PermisoParametros parametros,
         IReadOnlySet<DateTime> feriados)
     {
+        if (nueva.Tipo == PermisoValores.TipoVacaciones) return;
+        var existentes = todos.Where(e => e.Tipo != PermisoValores.TipoVacaciones).ToList();
+
         if (nueva.Tipo == PermisoValores.TipoDia && parametros.MaxDiasPorPermiso is { } maxDias && dias > maxDias)
         {
             throw new ArgumentException(
@@ -111,6 +121,25 @@ internal static class PermisoReglas
             }
         }
 
+        // Tope mensual: días completos y horas suman juntos (con jornada de 8 h, 2 días = 16 horas).
+        // Un permiso que cruza de mes cuenta en cada mes sus días de ese mes.
+        if (parametros.MaxDiasPorMes is { } maxDiasMes)
+        {
+            for (var mes = new DateTime(nueva.FechaInicio.Year, nueva.FechaInicio.Month, 1); mes <= nueva.FechaFin; mes = mes.AddMonths(1))
+            {
+                var finMes = mes.AddMonths(1).AddDays(-1);
+                var usados = existentes.Sum(e => DiasEntre(e.Tipo, e.FechaInicio, e.FechaFin, e.Minutos, mes, finMes, parametros, feriados))
+                    + DiasEntre(nueva.Tipo, nueva.FechaInicio, nueva.FechaFin, minutos, mes, finMes, parametros, feriados);
+                if (usados > maxDiasMes)
+                {
+                    throw new ArgumentException(
+                        "Permiso no permitido porque se pasa del tiempo estipulado: el máximo es "
+                        + $"{Numero(maxDiasMes)} días ({Numero(maxDiasMes * parametros.MinutosJornada / 60m)} horas) al mes y con este permiso "
+                        + $"el empleado sumaría {Numero(usados)} días ({Numero(usados * parametros.MinutosJornada / 60m)} horas) en {mes:MM/yyyy}.");
+                }
+            }
+        }
+
         if (parametros.MaxDiasPorAnio is not { } maxAnio) return;
         for (var anio = nueva.FechaInicio.Year; anio <= nueva.FechaFin.Year; anio++)
         {
@@ -124,8 +153,7 @@ internal static class PermisoReglas
         }
     }
 
-    // Días que un permiso aporta al año indicado: los hábiles del rango dentro de ese año, o
-    // las horas convertidas a días con la jornada.
+    // Días que un permiso aporta al año indicado.
     public static decimal DiasEnAnio(
         string tipo,
         DateTime inicio,
@@ -133,15 +161,28 @@ internal static class PermisoReglas
         int minutos,
         int anio,
         PermisoParametros parametros,
+        IReadOnlySet<DateTime> feriados) =>
+        DiasEntre(tipo, inicio, fin, minutos, new DateTime(anio, 1, 1), new DateTime(anio, 12, 31), parametros, feriados);
+
+    // Días que un permiso aporta entre dos fechas (un mes o un año): los hábiles del rango dentro
+    // de ellas, o las horas convertidas a días con la jornada si su fecha cae dentro.
+    public static decimal DiasEntre(
+        string tipo,
+        DateTime inicio,
+        DateTime fin,
+        int minutos,
+        DateTime desdePeriodo,
+        DateTime hastaPeriodo,
+        PermisoParametros parametros,
         IReadOnlySet<DateTime> feriados)
     {
         if (tipo == PermisoValores.TipoHora)
         {
-            return inicio.Year == anio ? (decimal)minutos / parametros.MinutosJornada : 0;
+            return inicio >= desdePeriodo && inicio <= hastaPeriodo ? (decimal)minutos / parametros.MinutosJornada : 0;
         }
 
-        var desde = inicio > new DateTime(anio, 1, 1) ? inicio : new DateTime(anio, 1, 1);
-        var hasta = fin < new DateTime(anio, 12, 31) ? fin : new DateTime(anio, 12, 31);
+        var desde = inicio > desdePeriodo ? inicio : desdePeriodo;
+        var hasta = fin < hastaPeriodo ? fin : hastaPeriodo;
         return desde <= hasta ? ContarDiasHabiles(desde, hasta, feriados) : 0;
     }
 
@@ -166,15 +207,24 @@ internal static class PermisoReglas
         return ahora >= fechaFin.Date.Add(horaFin.ToTimeSpan());
     }
 
-    private static string Describir(Existente permiso) => permiso.Tipo == PermisoValores.TipoHora
-        ? $"un permiso por hora el {permiso.FechaInicio:dd/MM/yyyy} de {permiso.HoraSalida:HH:mm} a {permiso.HoraEntrada:HH:mm}"
-        : permiso.FechaInicio == permiso.FechaFin
-            ? $"un permiso por día el {permiso.FechaInicio:dd/MM/yyyy}"
-            : $"un permiso por día del {permiso.FechaInicio:dd/MM/yyyy} al {permiso.FechaFin:dd/MM/yyyy}";
+    private static string Describir(Existente permiso)
+    {
+        if (permiso.Tipo == PermisoValores.TipoHora)
+        {
+            return $"un permiso por hora el {permiso.FechaInicio:dd/MM/yyyy} de {permiso.HoraSalida:HH:mm} a {permiso.HoraEntrada:HH:mm}";
+        }
+        var que = permiso.Tipo == PermisoValores.TipoVacaciones ? "vacaciones" : "un permiso por día";
+        return permiso.FechaInicio == permiso.FechaFin
+            ? $"{que} el {permiso.FechaInicio:dd/MM/yyyy}"
+            : $"{que} del {permiso.FechaInicio:dd/MM/yyyy} al {permiso.FechaFin:dd/MM/yyyy}";
+    }
 
     private static string Numero(decimal valor) => valor.ToString("0.##", CultureInfo.InvariantCulture);
 
-    // Permiso a guardar, ya normalizado. En el de hora FechaInicio y FechaFin son la misma fecha.
+    // Permiso o vacaciones a guardar, ya normalizado. En el de hora FechaInicio y FechaFin son la
+    // misma fecha. FechaSolicitud solo viene en las vacaciones; en los permisos la pone el servidor
+    // (la del día en que se registra). NoPago es el escrito en el permiso (los de día y hora);
+    // Lugar y Telefono, los del permiso por día.
     public sealed record Solicitud(
         string Tipo,
         int IdEmpleado,
@@ -183,7 +233,10 @@ internal static class PermisoReglas
         DateTime FechaFin,
         TimeOnly? HoraSalida,
         TimeOnly? HoraEntrada,
-        DateTime? FechaSolicitud);
+        DateTime? FechaSolicitud = null,
+        string? NoPago = null,
+        string? Lugar = null,
+        string? Telefono = null);
 
     // Permiso activo del mismo empleado, usado para revisar choques y límites.
     public sealed record Existente(

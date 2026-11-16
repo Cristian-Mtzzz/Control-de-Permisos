@@ -1,14 +1,79 @@
-/* Estilos globales: tipografías, reset mínimo y acciones compartidas entre paneles.
-    Las clases de refresco y cierre de sesión se definen aquí para que mantengan
-    la misma apariencia en todas las pantallas. */
-:root {
-    font-family: 'Segoe UI', sans-serif;
-    color: #203238;
-    background: #edf4f2;
-    font-synthesis: none;
-    text-rendering: optimizeLegibility;
+/* Estilos globales del Control de permisos.
+   1. Tipografía y colores (variables).
+   2. Base.
+   3. Piezas del área de trabajo (.workspace): secciones, botones, campos, tablas, etiquetas,
+      mensajes y ventanas. Son globales porque las comparten la pantalla de permisos, la de
+      personal y la de áreas; cada componente solo agrega su propia distribución. */
+
+@font-face {
+    font-family: 'Public Sans';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/public-sans-latin.woff2') format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
+@font-face {
+    font-family: 'Public Sans';
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url('/fonts/public-sans-latin-ext.woff2') format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ---- 1. Variables ------------------------------------------------------------------ */
+:root {
+    /* Azul añil del instituto (barra lateral) y el dorado de su escudo (acento). */
+    --anil: #12233f;
+    --anil-2: #1b3156;
+    --oro: #b8902f;
+    --oro-suave: #f6eedb;
+
+    --papel: #f3f5f8;
+    --superficie: #ffffff;
+    --tinta: #18222f;
+    --tinta-2: #3a4757;
+    --gris: #5c6878;
+    --gris-2: #8a95a3;
+    --linea: #e1e6ed;
+    --linea-2: #ccd4de;
+
+    --primario: #1f4e8c;
+    --primario-hover: #183f72;
+    --primario-suave: #e8eef7;
+
+    /* Tipos de permiso: por día (azul) y por hora (verde azulado). */
+    --dia: #2b5797;
+    --dia-suave: #e6edf8;
+    --hora: #1c7c6e;
+    --hora-suave: #e1f2ef;
+    /* Vacaciones (ámbar). */
+    --vac: #8a5a10;
+    --vac-suave: #fbf0da;
+
+    --ok: #1d7a4f;
+    --ok-suave: #e3f3ea;
+    --peligro: #b03a3a;
+    --peligro-suave: #fbeaea;
+    --apagado: #6b7685;
+    --apagado-suave: #eceff3;
+
+    --radio: 8px;
+    --radio-grande: 12px;
+
+    font-family: 'Public Sans', 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+    color: var(--tinta);
+    background: var(--papel);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ---- 2. Base ----------------------------------------------------------------------- */
 * {
     box-sizing: border-box;
 }
@@ -16,119 +81,773 @@
 body {
     margin: 0;
     min-width: 320px;
+    background: var(--papel);
 }
 
 button,
-input {
+input,
+select,
+textarea {
     font: inherit;
 }
 
-.refresh-button,
-.workshop-shell .refresh-button {
-    padding: .78rem 1rem !important;
-    border: 0 !important;
-    border-radius: 5px !important;
-    color: #fff !important;
-    background: #276968 !important;
-    box-shadow: 0 4px 10px rgba(39, 105, 104, .14);
-    cursor: pointer;
-    font-weight: 700;
-    transition: background .2s, box-shadow .2s, transform .2s;
-}
-
-.refresh-button:hover:not(:disabled),
-.workshop-shell .refresh-button:hover:not(:disabled) {
-    background: #1b5252 !important;
-    box-shadow: 0 6px 14px rgba(39, 105, 104, .2);
-    transform: translateY(-1px);
-}
-
-.refresh-button:disabled {
-    cursor: wait;
-    opacity: .65;
-}
-
-.workshop-shell .logout-button {
-    padding: .72rem 1rem !important;
-    border: 1px solid #d99b93 !important;
-    border-radius: 6px !important;
-    color: #9b3f38 !important;
-    background: #fff !important;
-    box-shadow: 0 3px 8px rgba(155, 63, 56, .08);
-    cursor: pointer;
-    font-weight: 700;
-    transition: background .2s, border-color .2s, box-shadow .2s, transform .2s;
-}
-
-.workshop-shell .logout-button:hover {
-    border-color: #bd5b52 !important;
-    background: #fcece9 !important;
-    box-shadow: 0 5px 12px rgba(155, 63, 56, .14);
-    transform: translateY(-1px);
-}
-
-/* Buscador, filtro, "Mostrar N registros" y "Añadir usuario" van en una sola fila;
-   la columna flexible antes del selector lo empuja junto al botón, a la derecha. */
-
-.workshop-shell .table-wrap {
-    width: 100%;
-    border: 1px solid #d5e1dd;
-    border-radius: 6px;
-    background: #fff;
-}
-
-/* Respuesta táctil moderna para todos los botones del sistema. */
 button {
-    transition: transform .15s ease, box-shadow .2s ease, background .2s ease, border-color .2s ease, opacity .2s ease;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, box-shadow .15s ease;
 }
 
-button:active:not(:disabled) {
-    transform: scale(.96);
-}
-
-button:focus-visible {
-    outline: 2px solid #276968;
+:focus-visible {
+    outline: 2px solid var(--primario);
     outline-offset: 2px;
 }
 
-/* La pestaña activa del panel usa el mismo relleno que los botones principales del tema. */
-
-/* Animación de entrada compartida por todas las ventanas emergentes (todas las pantallas). */
-@keyframes modalBackdropIn {
-    from {
-        opacity: 0;
-    }
-
-    to {
-        opacity: 1;
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: .01ms !important;
+        transition-duration: .01ms !important;
     }
 }
 
-@keyframes modalPanelIn {
-    from {
-        opacity: 0;
-        transform: translateY(16px) scale(.96);
+/* ---- 3. Área de trabajo ------------------------------------------------------------ */
+.workspace h1,
+.workspace h2,
+.workspace h3 {
+    margin: 0;
+    color: var(--tinta);
+    letter-spacing: -.01em;
+}
+
+/* Contexto pequeño sobre un título (departamento, "Editar usuario"...). */
+.workspace .eyebrow {
+    margin: 0 0 .2rem;
+    color: var(--gris);
+    font-size: .8rem;
+    font-weight: 500;
+}
+
+/* Sección: superficie blanca con borde fino. */
+.workspace .workshop-section {
+    display: grid;
+    gap: 1rem;
+    margin-top: 1.25rem;
+    padding: 1.25rem 1.4rem;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio-grande);
+    background: var(--superficie);
+}
+
+.workspace .workshop-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem 1rem;
+}
+
+.workspace .workshop-actions h2 {
+    font-size: 1.1rem;
+    font-weight: 650;
+}
+
+.workspace .workshop-actions-group {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+}
+
+/* -- Botones. Sin clase: acción principal. -- */
+.workspace button:where(:not(.secondary, .danger, .danger-solid, .link-button, .empleado-link, .modal-close,
+    .searchable-select-toggle, .nav-item, .vista-tab, .tipo-option, .table-paginator-buttons button)) {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    min-height: 2.5rem;
+    padding: .55rem 1rem;
+    border: 1px solid var(--primario);
+    border-radius: var(--radio);
+    color: #fff;
+    background: var(--primario);
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
+}
+
+.workspace button:where(:not(.secondary, .danger, .danger-solid, .link-button, .empleado-link, .modal-close,
+    .searchable-select-toggle, .nav-item, .vista-tab, .tipo-option, .table-paginator-buttons button)):hover:not(:disabled) {
+    border-color: var(--primario-hover);
+    background: var(--primario-hover);
+}
+
+.workspace button.secondary,
+.workspace button.danger,
+.workspace button.danger-solid {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: .45rem;
+    min-height: 2.5rem;
+    padding: .55rem 1rem;
+    border: 1px solid var(--linea-2);
+    border-radius: var(--radio);
+    color: var(--tinta-2);
+    background: var(--superficie);
+    cursor: pointer;
+    font-size: .875rem;
+    font-weight: 600;
+}
+
+.workspace button.secondary:hover:not(:disabled) {
+    border-color: var(--gris-2);
+    background: var(--papel);
+}
+
+.workspace button.danger {
+    border-color: #e7c3c3;
+    color: var(--peligro);
+}
+
+.workspace button.danger:hover:not(:disabled) {
+    border-color: var(--peligro);
+    background: var(--peligro-suave);
+}
+
+.workspace button.danger-solid {
+    border-color: var(--peligro);
+    color: #fff;
+    background: var(--peligro);
+}
+
+.workspace button.danger-solid:hover:not(:disabled) {
+    background: #8f2e2e;
+}
+
+.workspace button:disabled {
+    cursor: not-allowed;
+    opacity: .55;
+}
+
+.workspace .link-button {
+    padding: .25rem .35rem;
+    border: 0;
+    border-radius: 4px;
+    color: var(--primario);
+    background: transparent;
+    cursor: pointer;
+    font-size: .82rem;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+
+.workspace .link-button:hover {
+    color: var(--primario-hover);
+}
+
+/* -- Campos. -- */
+.workspace input:not([type='checkbox'], [type='radio']),
+.workspace select,
+.workspace textarea {
+    width: 100%;
+    min-height: 2.5rem;
+    padding: .5rem .75rem;
+    border: 1px solid var(--linea-2);
+    border-radius: var(--radio);
+    outline: none;
+    color: var(--tinta);
+    background: var(--superficie);
+    font-size: .875rem;
+}
+
+.workspace textarea {
+    resize: vertical;
+    line-height: 1.45;
+}
+
+.workspace select {
+    padding-right: 2.2rem;
+    appearance: none;
+    background: var(--superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%235c6878' stroke-width='2' stroke-linecap='round' stroke-linejoin='round' viewBox='0 0 24 24'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right .8rem center;
+    cursor: pointer;
+}
+
+.workspace input:not([type='checkbox'], [type='radio']):focus,
+.workspace select:focus,
+.workspace textarea:focus {
+    border-color: var(--primario);
+    box-shadow: 0 0 0 3px rgba(31, 78, 140, .14);
+}
+
+.workspace input:disabled,
+.workspace select:disabled {
+    color: var(--gris);
+    background: var(--papel);
+    cursor: not-allowed;
+}
+
+.workspace input[type='checkbox'],
+.workspace input[type='radio'] {
+    accent-color: var(--primario);
+}
+
+.workspace .field-hint {
+    margin: 0;
+    color: var(--gris);
+    font-size: .8rem;
+}
+
+/* Filtros en línea sobre una tabla. */
+.workspace .permisos-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .6rem;
+}
+
+.workspace .permisos-filters select {
+    width: auto;
+}
+
+.workspace .permisos-search {
+    flex: 0 1 22rem;
+    padding-left: 2.2rem !important;
+    background: var(--superficie) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%238a95a3' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E") no-repeat .75rem center !important;
+}
+
+.workspace .permisos-filters app-table-page-size {
+    margin-left: auto;
+}
+
+.workspace .inline-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: .5rem;
+    color: var(--gris);
+    font-size: .82rem;
+    font-weight: 500;
+}
+
+.workspace .inline-filter select,
+.workspace .inline-filter input {
+    width: auto;
+}
+
+.workspace .row-select {
+    width: auto;
+    min-width: 11rem;
+    min-height: 2.2rem;
+    padding: .3rem .6rem;
+}
+
+/* Campo editable dentro de una fila (No. de pago en Personal). "input." para ganarle al ancho
+   completo de los campos de .workspace. */
+.workspace input.row-input {
+    width: 9rem;
+    min-height: 2.2rem;
+    padding: .3rem .6rem;
+}
+
+/* -- Tablas. -- */
+.workspace .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--linea);
+    border-radius: var(--radio);
+    background: var(--superficie);
+}
+
+.workspace .table-wrap table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .84rem;
+}
+
+.workspace .resumen-table {
+    min-width: 720px;
+}
+
+.workspace .jefes-table {
+    min-width: 900px;
+}
+
+.workspace .table-wrap th {
+    position: sticky;
+    top: 0;
+    padding: .65rem .8rem;
+    border-bottom: 1px solid var(--linea);
+    color: var(--gris);
+    background: #f8f9fb;
+    font-size: .78rem;
+    font-weight: 600;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.workspace .table-wrap td {
+    padding: .7rem .8rem;
+    border-bottom: 1px solid var(--linea);
+    color: var(--tinta-2);
+    text-align: left;
+    vertical-align: middle;
+}
+
+.workspace .table-wrap tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.workspace .table-wrap tbody tr:hover td {
+    background: #f8fafc;
+}
+
+.workspace .table-wrap td:first-child {
+    color: var(--tinta);
+    font-weight: 600;
+}
+
+.workspace th.num,
+.workspace td.num {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+}
+
+.workspace .empty {
+    padding: 2.5rem 1rem !important;
+    color: var(--gris) !important;
+    font-weight: 400 !important;
+    text-align: center !important;
+}
+
+.workspace .permiso-anulado td {
+    color: var(--gris-2);
+}
+
+.workspace .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+}
+
+/* Los botones de ícono de una fila van siempre en un renglón. */
+.workspace .row-actions-inline {
+    flex-wrap: nowrap;
+    align-items: center;
+}
+
+.workspace .table-wrap td button:not(.empleado-link) {
+    white-space: nowrap;
+    min-height: 2rem !important;
+    padding: .3rem .7rem !important;
+    font-size: .78rem !important;
+}
+
+/* Botones de ícono de las tablas: el nombre de la acción sale en un globo a la izquierda (arriba
+   se cortaría en la primera fila, porque la tabla tiene su propio desplazamiento). */
+.workspace .table-wrap td button.icon-button {
+    position: relative;
+    width: 2rem;
+    padding: 0 !important;
+}
+
+.workspace .icon-button svg {
+    width: 1rem;
+    height: 1rem;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.9;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+}
+
+/* Colores por acción: editar en verde, eliminar en rojo, imprimir en azul y restablecer en ámbar. */
+.workspace .table-wrap td button.icon-editar {
+    border-color: #bfe0c8;
+    color: #2f7d4a;
+    background: #eef8f1;
+}
+
+.workspace .table-wrap td button.icon-editar:hover:not(:disabled) {
+    border-color: #2f7d4a;
+    background: #ddf1e3;
+}
+
+.workspace .table-wrap td button.icon-eliminar {
+    border-color: #efc4c4;
+    color: var(--peligro);
+    background: var(--peligro-suave);
+}
+
+.workspace .table-wrap td button.icon-eliminar:hover:not(:disabled) {
+    border-color: var(--peligro);
+}
+
+/* Imprimir, en el azul de la aplicación. */
+.workspace .table-wrap td button.icon-imprimir {
+    border-color: #c9d3e3;
+    color: var(--anil-2);
+    background: #eef2f8;
+}
+
+.workspace .table-wrap td button.icon-imprimir:hover:not(:disabled) {
+    border-color: var(--anil-2);
+    background: #dfe6f1;
+}
+
+.workspace .table-wrap td button.icon-restablecer {
+    border-color: #f0d9a6;
+    color: #a36a10;
+    background: #fdf6e7;
+}
+
+.workspace .table-wrap td button.icon-restablecer:hover:not(:disabled) {
+    border-color: #a36a10;
+    background: #faecc9;
+}
+
+.workspace .icon-button::after {
+    position: absolute;
+    top: 50%;
+    right: calc(100% + .45rem);
+    z-index: 2;
+    padding: .3rem .55rem;
+    border-radius: 6px;
+    color: #fff;
+    background: var(--tinta);
+    content: attr(data-tip);
+    font-size: .75rem;
+    font-weight: 500;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transform: translateY(-50%);
+    transition: opacity .12s ease;
+}
+
+.workspace .icon-button:hover::after,
+.workspace .icon-button:focus-visible::after {
+    opacity: 1;
+}
+
+/* Texto solo para lectores de pantalla (el nombre de un botón de ícono). */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+.workspace .closed {
+    color: var(--gris-2);
+    font-size: .8rem;
+}
+
+/* -- Etiquetas de tipo y estado. El texto viene en mayúsculas desde los datos; se muestra
+      en minúsculas con la inicial en mayúscula. -- */
+.workspace .tipo-badge,
+.workspace .estado-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    padding: .15rem .55rem .15rem .45rem;
+    border-radius: 999px;
+    font-size: .76rem;
+    font-weight: 600;
+    white-space: nowrap;
+    text-transform: lowercase;
+}
+
+.workspace .tipo-badge::first-letter,
+.workspace .estado-badge::first-letter {
+    text-transform: uppercase;
+}
+
+.workspace .tipo-badge::before,
+.workspace .estado-badge::before {
+    width: .45rem;
+    height: .45rem;
+    border-radius: 50%;
+    background: currentColor;
+    content: '';
+}
+
+.workspace .tipo-badge {
+    color: var(--dia);
+    background: var(--dia-suave);
+}
+
+.workspace .tipo-badge.hora {
+    color: var(--hora);
+    background: var(--hora-suave);
+}
+
+.workspace .tipo-badge.vacaciones {
+    color: var(--vac);
+    background: var(--vac-suave);
+}
+
+.workspace .estado-badge {
+    color: var(--ok);
+    background: var(--ok-suave);
+}
+
+.workspace .estado-badge.anulado {
+    color: var(--peligro);
+    background: var(--peligro-suave);
+}
+
+.workspace .estado-badge.finalizado {
+    color: var(--apagado);
+    background: var(--apagado-suave);
+}
+
+/* -- Mensajes. -- */
+.workspace .feedback {
+    margin: 1rem 0 0;
+    padding: .7rem 1rem;
+    border: 1px solid currentColor;
+    border-radius: var(--radio);
+    font-size: .875rem;
+}
+
+.workspace .feedback.success {
+    border-color: #b9dfc9;
+    color: var(--ok);
+    background: var(--ok-suave);
+}
+
+.workspace .feedback.error {
+    border-color: #ecc4c4;
+    color: var(--peligro);
+    background: var(--peligro-suave);
+}
+
+.workspace .feedback.aviso {
+    border-color: #c6d4e8;
+    color: var(--primario);
+    background: var(--primario-suave);
+}
+
+/* -- Ventanas. -- */
+@keyframes fondoEntra {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes ventanaEntra {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: none; }
+}
+
+.workspace .modal-backdrop {
+    position: fixed;
+    z-index: 40;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: 1rem;
+    overflow: auto;
+    background: rgba(18, 35, 63, .45);
+    animation: fondoEntra .15s ease;
+}
+
+.workspace .workshop-modal {
+    width: min(560px, 100%);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    padding: 1.5rem;
+    border-radius: var(--radio-grande);
+    background: var(--superficie);
+    box-shadow: 0 24px 64px rgba(18, 35, 63, .28);
+    animation: ventanaEntra .2s cubic-bezier(.16, 1, .3, 1);
+}
+
+.workspace .modal-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+}
+
+.workspace .modal-heading h2 {
+    font-size: 1.3rem;
+    font-weight: 650;
+}
+
+.workspace .modal-subtitle {
+    margin: .3rem 0 0;
+    color: var(--gris);
+    font-size: .85rem;
+}
+
+.workspace .modal-close {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 2.2rem;
+    height: 2.2rem;
+    border: 0;
+    border-radius: var(--radio);
+    color: var(--gris);
+    background: transparent;
+    cursor: pointer;
+    font-size: 1.5rem;
+    line-height: 1;
+}
+
+.workspace .modal-close:hover {
+    color: var(--tinta);
+    background: var(--papel);
+}
+
+.workspace .workshop-modal form {
+    display: grid;
+    gap: .55rem;
+}
+
+.workspace .workshop-modal label,
+.workspace .form-label {
+    color: var(--tinta-2);
+    font-size: .82rem;
+    font-weight: 600;
+}
+
+.workspace .workshop-modal form > label:not(.check-option),
+.workspace .workshop-modal form > .form-label {
+    margin-top: .35rem;
+}
+
+.workspace .workshop-modal form > button[type='submit'] {
+    margin-top: .75rem;
+}
+
+.workspace .form-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: .75rem;
+}
+
+.workspace .form-pair label {
+    display: block;
+    margin: .35rem 0 .3rem;
+}
+
+.workspace .form-preview {
+    margin: 0;
+    padding: .55rem .8rem;
+    border-radius: var(--radio);
+    color: var(--primario);
+    background: var(--primario-suave);
+    font-size: .84rem;
+}
+
+/* Memorando: más ancho, para que Para y De quepan en dos columnas. */
+.workspace .workshop-modal.memo-modal {
+    width: min(720px, 100%);
+}
+
+.workspace .memo-modal .report-empleados .form-pair label {
+    margin-top: 0;
+}
+
+.workspace .memo-sin-pago {
+    color: #8a5a00;
+}
+
+.workspace .memo-periodo {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .4rem .8rem;
+}
+
+.workspace .memo-detalle {
+    margin-left: .35rem;
+    color: var(--gris);
+    font-size: .78rem;
+    white-space: nowrap;
+}
+
+.workspace .check-option {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    font-weight: 500 !important;
+    cursor: pointer;
+}
+
+.workspace .check-option input {
+    flex: none;
+    width: 1rem;
+    height: 1rem;
+    margin: 0;
+}
+
+/* Agregar empleado a un área. */
+.workspace .personal-add {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: .75rem;
+}
+
+.workspace .personal-add-field {
+    display: grid;
+    flex: 0 1 28rem;
+    gap: .35rem;
+    min-width: 0;
+}
+
+.workspace .personal-add-field label {
+    color: var(--tinta-2);
+    font-size: .82rem;
+    font-weight: 600;
+}
+
+@media (max-width: 560px) {
+    .workspace .form-pair {
+        grid-template-columns: 1fr;
     }
 
-    to {
-        opacity: 1;
-        transform: translateY(0) scale(1);
+    .workspace .workshop-section {
+        padding: 1rem;
+    }
+
+    .workspace .permisos-filters app-table-page-size {
+        margin-left: 0;
     }
 }
 
-.modal-backdrop {
-    animation: modalBackdropIn .18s ease;
-}
-
-.modal-backdrop>* {
-    animation: modalPanelIn .25s cubic-bezier(.16, 1, .3, 1);
-}
-
+/* ---- Listas desplegables (SearchableSelectDirective) -------------------------------- */
+/* El campo visible y el <select> oculto comparten la celda: el ancho lo da el <select>, así las
+   reglas de ancho de los select (filtros, "Mostrar N registros", la tabla de Personal) siguen igual. */
 .searchable-select {
     position: relative;
-    display: block;
-    width: 100%;
+    display: grid;
     min-width: 0;
+}
+
+.searchable-select > .searchable-select-input,
+.searchable-select > .searchable-select-source {
+    grid-area: 1 / 1;
+}
+
+/* Sin búsqueda (sinBusqueda): se abre y se elige, como un select. */
+.searchable-select-input[readonly] {
+    cursor: pointer;
+    caret-color: transparent;
+}
+
+/* El selector de área de cada fila de Personal es más bajo. */
+.searchable-select:has(> .row-select) > .searchable-select-input {
+    min-height: 2.2rem;
+    padding: .3rem 2.2rem .3rem .6rem !important;
 }
 
 .searchable-select-toggle {
@@ -138,19 +857,19 @@ button:focus-visible {
     z-index: 1;
     display: grid;
     place-items: center;
-    width: 2.5rem;
+    width: 2.4rem;
     height: 100%;
     padding: 0;
     border: 0;
-    border-radius: 0 4px 4px 0;
-    color: #617573;
+    border-radius: 0 var(--radio) var(--radio) 0;
+    color: var(--gris);
     background: transparent;
     cursor: pointer;
 }
 
 .searchable-select-toggle::before {
-    width: .45rem;
-    height: .45rem;
+    width: .42rem;
+    height: .42rem;
     border-right: 1.5px solid currentColor;
     border-bottom: 1.5px solid currentColor;
     content: '';
@@ -164,53 +883,46 @@ button:focus-visible {
 
 .searchable-select-toggle:disabled {
     cursor: not-allowed;
-    opacity: .65;
+    opacity: .6;
 }
 
 .searchable-select-input {
     display: block;
     width: 100%;
     min-width: 0;
-    min-height: 2.65rem;
-    padding: .7rem 2.2rem .7rem .75rem;
-    border: 1px solid #d7e2df;
-    border-radius: 4px;
+    min-height: 2.5rem;
+    padding: .5rem 2.2rem .5rem .75rem !important;
+    border: 1px solid var(--linea-2);
+    border-radius: var(--radio);
     outline: none;
-    color: #203238;
-    background: #fff;
+    color: var(--tinta);
+    background: var(--superficie);
 }
 
 .searchable-select-input:focus {
-    border-color: #397b78;
-    box-shadow: 0 0 0 3px rgba(57, 123, 120, .12);
+    border-color: var(--primario);
+    box-shadow: 0 0 0 3px rgba(31, 78, 140, .14);
 }
 
 .searchable-select-input:disabled {
-    color: #718080;
-    background: #f0f4f3;
+    color: var(--gris);
+    background: var(--papel);
     cursor: not-allowed;
 }
 
 .searchable-select-source {
-    position: absolute !important;
-    width: 1px !important;
-    height: 1px !important;
-    overflow: hidden !important;
-    clip: rect(0, 0, 0, 0) !important;
-    clip-path: inset(50%) !important;
-    white-space: nowrap !important;
-    border: 0 !important;
-    opacity: 0 !important;
+    visibility: hidden !important;
     pointer-events: none !important;
 }
 
 .searchable-select-listbox {
     max-height: 280px;
+    margin-top: .25rem;
     overflow-y: auto;
-    border: 1px solid #c8d7d2;
-    border-radius: 4px;
-    background: #fff;
-    box-shadow: 0 12px 26px rgba(12, 38, 39, .16);
+    border: 1px solid var(--linea-2);
+    border-radius: var(--radio);
+    background: var(--superficie);
+    box-shadow: 0 12px 28px rgba(18, 35, 63, .16);
 }
 
 .searchable-select-listbox[hidden] {
@@ -218,192 +930,25 @@ button:focus-visible {
 }
 
 .searchable-select-option {
-    padding: .6rem .75rem;
-    color: #203238;
+    padding: .55rem .75rem;
+    color: var(--tinta);
     cursor: pointer;
-    font-size: .84rem;
+    font-size: .85rem;
     overflow-wrap: anywhere;
 }
 
 .searchable-select-option:hover,
 .searchable-select-option.active {
-    background: #e8f2ee;
+    background: var(--primario-suave);
 }
 
 .searchable-select-option[aria-selected='true'] {
-    color: #1f5e5b;
-    font-weight: 700;
+    color: var(--primario);
+    font-weight: 600;
 }
 
 .searchable-select-empty {
     padding: .7rem .75rem;
-    color: #718080;
+    color: var(--gris);
     font-size: .82rem;
 }
-/* ------------------------------------------------------------------
-   Estructura común de los paneles (todas las pantallas):
-   título de la página, pestañas de sección, tarjetas y mensajes.
-   ------------------------------------------------------------------ */
-.panel-heading {
-    padding: 1.6rem 0 1.25rem;
-}
-
-.panel-heading .eyebrow {
-    margin-bottom: .4rem;
-}
-
-.panel-heading h1 {
-    font-size: clamp(1.55rem, 3vw, 2.1rem);
-    line-height: 1.15;
-}
-
-/* Cada sección del panel se presenta como una tarjeta blanca sobre el fondo verde claro. */
-
-.workshop-shell .workshop-section {
-    padding: clamp(1rem, 2vw, 1.5rem);
-    border: 1px solid #dfe9e5;
-    border-radius: 12px;
-    background: #fff;
-    box-shadow: 0 1px 3px rgba(23, 63, 67, .05), 0 10px 28px rgba(23, 63, 67, .04);
-}
-
-.workshop-shell .feedback {
-    border-left: 4px solid currentColor;
-    border-radius: 6px;
-}
-
-/* ------------------------------------------------------------------
-   Estilo común de tablas y botones del panel. Solo define forma,
-   espaciado y sombras: los colores vienen de cada componente.
-   ------------------------------------------------------------------ */
-.workshop-shell {
-    --ui-radius: 8px;
-    --ui-line: #e3ece9;
-    --ui-head: #f6f9f8;
-}
-
-/* Tablas: contenedor con borde redondeado, encabezado gris en mayúsculas y filas separadas. */
-.workshop-shell .table-wrap {
-    overflow-x: auto;
-    border: 1px solid #d5e1dd;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 1px 2px rgba(23, 63, 67, .04);
-}
-
-.workshop-shell .table-wrap table {
-    border-collapse: collapse;
-    color: #243a40;
-    font-size: .78rem;
-}
-
-.workshop-shell .table-wrap th {
-    padding: .85rem .75rem;
-    border-bottom: 1px solid #dfe9e5;
-    color: #617573;
-    background: var(--ui-head);
-    font-size: .66rem;
-    font-weight: 700;
-    letter-spacing: .06em;
-    text-align: left;
-    text-transform: uppercase;
-    white-space: nowrap;
-}
-
-.workshop-shell .table-wrap td {
-    padding: .8rem .75rem;
-    border-bottom: 1px solid var(--ui-line);
-}
-
-.workshop-shell .table-wrap tbody tr:last-child td {
-    border-bottom: 0;
-}
-
-.workshop-shell .table-wrap tbody tr {
-    transition: background .15s ease;
-}
-
-/* Filas alternas en verde claro y la primera columna (identificador del registro) resaltada.
-   Los :not() conservan la especificidad con la que se definieron estas reglas. */
-.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:nth-child(even) > td {
-    background: #f1f7ed;
-}
-
-.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr > td:first-child {
-    color: #18383b;
-    background: #eaf4e4;
-    font-weight: 700;
-}
-
-.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:nth-child(even) > td:first-child {
-    background: #e4f1dc;
-}
-
-.workshop-shell .table-wrap tbody tr:hover > td:not(.combo-shared-cell) {
-    background: #e8f2ef;
-}
-
-.workshop-shell .table-wrap table:not(.combo-inventory-table) tbody tr:hover > td:first-child {
-    background: #dcecd4;
-}
-
-/* Botones principales: esquinas redondeadas, peso medio y sombra suave que se eleva al pasar el cursor. */
-
-.workshop-shell .workshop-actions button:not(.secondary):not(.danger):not(.searchable-select-toggle),
-.workshop-shell .workshop-modal button[type='submit'] {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    gap: .45rem;
-    min-height: 2.65rem;
-    border-radius: var(--ui-radius) !important;
-    font-weight: 600;
-    letter-spacing: .01em;
-    box-shadow: 0 1px 2px rgba(16, 40, 42, .1), 0 4px 12px rgba(39, 105, 104, .14);
-}
-
-.workshop-shell .workshop-actions button:not(.secondary):not(.danger):not(.searchable-select-toggle):hover:not(:disabled),
-.workshop-shell .workshop-modal button[type='submit']:hover:not(:disabled) {
-    box-shadow: 0 2px 4px rgba(16, 40, 42, .1), 0 8px 20px rgba(39, 105, 104, .2);
-    transform: translateY(-1px);
-}
-
-/* Botones secundarios y de peligro fuera de las tablas: contorno suave. */
-.workshop-shell button:is(.secondary, .danger, .logout-button) {
-    border-radius: var(--ui-radius) !important;
-    font-weight: 600;
-    box-shadow: 0 1px 2px rgba(16, 40, 42, .06);
-}
-
-.workshop-shell button:is(.secondary):hover:not(:disabled) {
-    border-color: #8fb5ab;
-    box-shadow: 0 3px 10px rgba(39, 105, 104, .12);
-}
-
-.workshop-shell button.danger:hover:not(:disabled) {
-    border-color: #d99b93;
-    box-shadow: 0 3px 10px rgba(155, 63, 56, .12);
-}
-
-/* Acciones dentro de las tablas (Editar, Quitar, etc.): compactas y del mismo tamaño. */
-.workshop-shell .table-wrap td button:not(.reset-password-button) {
-    min-height: 1.95rem;
-    padding: .35rem .75rem;
-    border-radius: 6px !important;
-    font-size: .72rem;
-    font-weight: 600;
-    box-shadow: none;
-}
-
-.workshop-shell .table-wrap td button:not(.reset-password-button):hover:not(:disabled) {
-    box-shadow: 0 2px 8px rgba(23, 63, 67, .1);
-    transform: translateY(-1px);
-}
-
-/* Botón de refrescar con la misma forma redondeada. */
-
-.refresh-button {
-    border-radius: var(--ui-radius) !important;
-    font-weight: 600;
-}
-

@@ -1,14 +1,12 @@
 -- =====================================================================================
 -- Control de permisos - Instalación en un esquema nuevo
 --
--- Crea las tablas PERMISO_*, agrega a USUARIOS las columnas del perfil de acceso y un
+-- Crea las tablas PERMISO_*, la de usuarios del sistema (USUARIOS_PERMISOS) y un
 -- administrador inicial. Deja la base igual que la de producción, que llegó a este estado con
--- varios scripts de migración.
+-- varios scripts de migración (el último, migracion-usuarios-permisos.sql).
 --
 -- Requisitos: el esquema ya tiene las tablas del inventario que el sistema comparte. Las
--- columnas que usa la API son:
---   USUARIOS          (ID_USUARIO, USUARIO, NOMBRE_PERSONA, FECHA_EXPIRACION, ESTADO,
---                      PASSWORD_HASH, ROL, DOMINIOP, DOMINIO, CLAVE_SEGURA)
+-- columnas que usa la API son (USUARIOS del inventario ya no se usa):
 --   EMPLEADOS_IHSS    (EMPLEADOS_IHSS_ID, NOMBRE_EMPLEADO, NPAGO, DEPARTAMENTO_IHSS_ID, ESTADO 1/0)
 --   DEPARTAMENTO_IHSS (DEPARTAMENTO_IHSS_ID, DEPARTAMENTO_IHSS_DESC, EDIFICIO_ID, REGIONA_ID)
 --   EDIFICIO          (EDIFICIO_ID, EDIFICIO_DESCRIPCION, REGIONA_ID)
@@ -45,6 +43,9 @@ INSERT INTO PERMISO_PARAMETRO (CLAVE, VALOR, DESCRIPCION) VALUES
     ('MAX_HORAS_POR_MES', NULL, 'Máximo de horas de permiso por hora que un empleado puede usar en un mes. Vacío = sin límite');
 INSERT INTO PERMISO_PARAMETRO (CLAVE, VALOR, DESCRIPCION) VALUES
     ('MAX_DIAS_POR_ANIO', NULL, 'Máximo de días por empleado en el año; suma días y horas (jornada completa = 1 día). Vacío = sin límite');
+-- Tope mensual: 2 días (16 horas con jornada de 8 h) por empleado en cada mes.
+INSERT INTO PERMISO_PARAMETRO (CLAVE, VALOR, DESCRIPCION) VALUES
+    ('MAX_DIAS_POR_MES', '2', 'Máximo de días de permiso por empleado en un mes; suma días y horas (jornada completa = 1 día). Vacío = sin límite');
 
 -- -------------------------------------------------------------------------------------
 -- 2. Departamentos que usan el sistema. Después se agregan o desactivan desde la pantalla
@@ -124,12 +125,17 @@ CREATE TABLE PERMISO_AREA_EMPLEADO (
 CREATE INDEX IX_PERMISO_AREA_EMPLEADO_AREA ON PERMISO_AREA_EMPLEADO (ID_AREA);
 
 -- -------------------------------------------------------------------------------------
--- 7. Permisos registrados.
+-- 7. Permisos y vacaciones registrados.
 --    DIA:  FECHA_INICIO..FECHA_FIN, DIAS_HABILES calculado por la API, MINUTOS = 0.
 --    HORA: FECHA_INICIO = FECHA_FIN, HORA_SALIDA y HORA_ENTRADA en HH:mm, MINUTOS calculado.
+--    VAC:  vacaciones, como DIA, con MOTIVO = 'VACACIONES' y la FECHA_SOLICITUD indicada; chocan
+--          con los permisos, pero no cuentan en sus límites.
 --    Anular no borra: ESTADO pasa a ANULADO y el permiso deja de contar.
 --    ID_AREA es el área del empleado al registrarlo: el historial se queda en esa área.
---    LUGAR_SOLICITUD existe en producción pero la aplicación ya no lo usa.
+--    NO_PAGO es el No. de pago del permiso (el formulario lo carga de EMPLEADOS_IHSS.NPAGO);
+--    vacío en las vacaciones.
+--    LUGAR_SOLICITUD y TELEFONO: lugar desde donde se solicita y teléfono donde localizar al
+--    empleado, solo en el permiso por día (los pide su formato de impresión).
 -- -------------------------------------------------------------------------------------
 CREATE TABLE PERMISO_SOLICITUD (
     ID_PERMISO       NUMBER(10)     NOT NULL,
@@ -142,13 +148,15 @@ CREATE TABLE PERMISO_SOLICITUD (
     HORA_ENTRADA     VARCHAR2(5),
     DIAS_HABILES     NUMBER(5)      DEFAULT 0 NOT NULL,
     MINUTOS          NUMBER(5)      DEFAULT 0 NOT NULL,
+    NO_PAGO          VARCHAR2(20 CHAR),
     LUGAR_SOLICITUD  VARCHAR2(200),
+    TELEFONO         VARCHAR2(20 CHAR),
     FECHA_SOLICITUD  DATE,
     ESTADO           VARCHAR2(10)   DEFAULT 'ACTIVO' NOT NULL,
     FECHA_REGISTRO   DATE           DEFAULT SYSDATE NOT NULL,
     ID_AREA          NUMBER(10),
     CONSTRAINT PK_PERMISO_SOLICITUD PRIMARY KEY (ID_PERMISO),
-    CONSTRAINT CK_PERMISO_SOLICITUD_TIPO CHECK (TIPO IN ('DIA', 'HORA')),
+    CONSTRAINT CK_PERMISO_SOLICITUD_TIPO CHECK (TIPO IN ('DIA', 'HORA', 'VAC')),
     CONSTRAINT CK_PERMISO_SOLICITUD_ESTADO CHECK (ESTADO IN ('ACTIVO', 'ANULADO')),
     CONSTRAINT CK_PERMISO_SOLICITUD_FECHAS CHECK (FECHA_FIN >= FECHA_INICIO),
     CONSTRAINT FK_PERMISO_SOLICITUD_AREA FOREIGN KEY (ID_AREA) REFERENCES PERMISO_AREA (ID_AREA)
@@ -160,36 +168,58 @@ CREATE INDEX IX_PERMISO_SOLICITUD_FECHA_FIN ON PERMISO_SOLICITUD (FECHA_FIN);
 CREATE INDEX IX_PERMISO_SOLICITUD_AREA ON PERMISO_SOLICITUD (ID_AREA);
 
 -- -------------------------------------------------------------------------------------
--- 8. Perfil de acceso en USUARIOS (un solo nivel por usuario):
---      PERMISO_ADMIN = 1     -> administrador general (todos los departamentos).
---      ID_DEPTO_PERMISO      -> administrador de ese departamento.
---      ID_AREA_PERMISO       -> jefe de esa área.
---      PERMISO_CONSULTA = 1  -> consulta: ve y exporta todo, no modifica nada.
+-- 8. Usuarios del Control de permisos, aparte de USUARIOS del inventario (un solo nivel por usuario):
+--      PERMISO_ADMIN = 1   -> administrador general (todos los departamentos).
+--      ID_DEPTO_PERMISO    -> jefe (administrador) de ese departamento, o su secretaría cuando
+--                             PERMISO_SECRETARIA = 1 (ve y exporta ese departamento, no registra).
+--      ID_AREA_PERMISO     -> jefe de esa área.
+--      ID_EMPLEADO_PERMISO -> ese empleado: ve y registra solo sus propios permisos.
+--    DOMINIO = 1: entra con su cuenta de Active Directory (DOMINIOP); 0: usuario local.
+--    CLAVE_SEGURA = '0': usuario local con la contraseña inicial, debe cambiarla al entrar.
 -- -------------------------------------------------------------------------------------
-ALTER TABLE USUARIOS ADD (
-    PERMISO_ADMIN     NUMBER(1) DEFAULT 0 NOT NULL,
-    PERMISO_CONSULTA  NUMBER(1) DEFAULT 0 NOT NULL,
+CREATE TABLE USUARIOS_PERMISOS (
+    ID_USUARIO        NUMBER(10)     NOT NULL,
+    USUARIO           VARCHAR2(150)  NOT NULL,
+    NOMBRE_PERSONA    VARCHAR2(256),
+    PASSWORD_HASH     VARCHAR2(256)  NOT NULL,
+    DOMINIO           NUMBER(1)      DEFAULT 0 NOT NULL,
+    DOMINIOP          VARCHAR2(20),
+    CLAVE_SEGURA      VARCHAR2(1)    DEFAULT '0' NOT NULL,
+    ESTADO            VARCHAR2(10)   DEFAULT 'ACTIVO' NOT NULL,
+    FECHA_EXPIRACION  DATE,
+    PERMISO_ADMIN     NUMBER(1)      DEFAULT 0 NOT NULL,
     ID_DEPTO_PERMISO  NUMBER,
-    ID_AREA_PERMISO   NUMBER(10)
+    ID_AREA_PERMISO   NUMBER(10),
+    PERMISO_SECRETARIA NUMBER(1)     DEFAULT 0 NOT NULL,
+    ID_EMPLEADO_PERMISO NUMBER,
+    FECHA_REGISTRO    DATE           DEFAULT SYSDATE NOT NULL,
+    CONSTRAINT PK_USUARIOS_PERMISOS PRIMARY KEY (ID_USUARIO),
+    CONSTRAINT CK_USU_PERM_DOMINIO CHECK (DOMINIO IN (0, 1)),
+    CONSTRAINT CK_USU_PERM_CLAVE CHECK (CLAVE_SEGURA IN ('0', '1')),
+    CONSTRAINT CK_USU_PERM_ESTADO CHECK (ESTADO IN ('ACTIVO', 'INACTIVO')),
+    CONSTRAINT CK_USU_PERM_ADMIN CHECK (PERMISO_ADMIN IN (0, 1)),
+    CONSTRAINT CK_USU_PERM_UN_NIVEL CHECK (
+        PERMISO_ADMIN
+        + CASE WHEN ID_DEPTO_PERMISO IS NULL THEN 0 ELSE 1 END
+        + CASE WHEN ID_AREA_PERMISO IS NULL THEN 0 ELSE 1 END
+        + CASE WHEN ID_EMPLEADO_PERMISO IS NULL THEN 0 ELSE 1 END <= 1),
+    -- La secretaría es la de su departamento: sin departamento no hay a quién pertenecer.
+    CONSTRAINT CK_USU_PERM_SECRETARIA CHECK (
+        PERMISO_SECRETARIA IN (0, 1) AND (PERMISO_SECRETARIA = 0 OR ID_DEPTO_PERMISO IS NOT NULL)),
+    CONSTRAINT FK_USU_PERM_DEPTO FOREIGN KEY (ID_DEPTO_PERMISO)
+        REFERENCES PERMISO_DEPARTAMENTO (DEPARTAMENTO_IHSS_ID),
+    CONSTRAINT FK_USU_PERM_AREA FOREIGN KEY (ID_AREA_PERMISO)
+        REFERENCES PERMISO_AREA (ID_AREA),
+    CONSTRAINT FK_USU_PERM_EMPLEADO FOREIGN KEY (ID_EMPLEADO_PERMISO)
+        REFERENCES EMPLEADOS_IHSS (EMPLEADOS_IHSS_ID)
 );
-ALTER TABLE USUARIOS ADD CONSTRAINT CK_USUARIOS_PERMISO_ADMIN CHECK (PERMISO_ADMIN IN (0, 1));
-ALTER TABLE USUARIOS ADD CONSTRAINT CK_USUARIOS_PERMISO_CONSULTA CHECK (PERMISO_CONSULTA IN (0, 1));
-ALTER TABLE USUARIOS ADD CONSTRAINT FK_USUARIOS_DEPTO_PERMISO
-    FOREIGN KEY (ID_DEPTO_PERMISO) REFERENCES PERMISO_DEPARTAMENTO (DEPARTAMENTO_IHSS_ID);
-ALTER TABLE USUARIOS ADD CONSTRAINT FK_USUARIOS_AREA_PERMISO
-    FOREIGN KEY (ID_AREA_PERMISO) REFERENCES PERMISO_AREA (ID_AREA);
--- Índices de las llaves foráneas: sin ellos, cambiar un área o un departamento bloquea
--- USUARIOS completa (y con ella el inicio de sesión del inventario).
-CREATE INDEX IX_USUARIOS_DEPTO_PERMISO ON USUARIOS (ID_DEPTO_PERMISO);
-CREATE INDEX IX_USUARIOS_AREA_PERMISO ON USUARIOS (ID_AREA_PERMISO);
-
--- Las cuentas que solo usan este sistema tienen ROL = 'Permisos'. Si USUARIOS tiene una
--- restricción con la lista de roles permitidos (en el inventario, CHK_USUARIOS_ROL), hay que
--- agregarle 'Permisos' o crear usuarios falla con ORA-02290. Ver la lista actual:
---   SELECT SEARCH_CONDITION FROM USER_CONSTRAINTS WHERE CONSTRAINT_NAME = 'CHK_USUARIOS_ROL';
--- y recrearla con esos mismos roles más 'Permisos':
---   ALTER TABLE USUARIOS DROP CONSTRAINT CHK_USUARIOS_ROL;
---   ALTER TABLE USUARIOS ADD CONSTRAINT CHK_USUARIOS_ROL CHECK (ROL IN (<roles actuales>, 'Permisos'));
+-- El login busca por el usuario sin distinguir mayúsculas ni espacios: no se puede repetir.
+CREATE UNIQUE INDEX UX_USUARIOS_PERMISOS_USUARIO ON USUARIOS_PERMISOS (LOWER(TRIM(USUARIO)));
+-- Índices de las llaves foráneas: sin ellos, cambiar un área o un departamento bloquea la tabla.
+CREATE INDEX IX_USUARIOS_PERMISOS_DEPTO ON USUARIOS_PERMISOS (ID_DEPTO_PERMISO);
+CREATE INDEX IX_USUARIOS_PERMISOS_AREA ON USUARIOS_PERMISOS (ID_AREA_PERMISO);
+-- Un empleado tiene una sola cuenta; este índice es además el de su llave foránea.
+CREATE UNIQUE INDEX UX_USUARIOS_PERMISOS_EMPL ON USUARIOS_PERMISOS (ID_EMPLEADO_PERMISO);
 
 COMMIT;
 
@@ -205,14 +235,14 @@ COMMIT;
 -- -------------------------------------------------------------------------------------
 INSERT INTO PERMISO_DEPARTAMENTO (DEPARTAMENTO_IHSS_ID, ESTADO) VALUES (:ID_DEPARTAMENTO, 'ACTIVO');
 
-INSERT INTO USUARIOS
+INSERT INTO USUARIOS_PERMISOS
     (ID_USUARIO, USUARIO, NOMBRE_PERSONA, FECHA_EXPIRACION, ESTADO,
-     PASSWORD_HASH, ROL, DOMINIOP, DOMINIO, CLAVE_SEGURA, PERMISO_ADMIN)
+     PASSWORD_HASH, DOMINIOP, DOMINIO, CLAVE_SEGURA, PERMISO_ADMIN)
 SELECT NVL(MAX(ID_USUARIO), 0) + 1, 'admin.permisos', 'Administrador de permisos', NULL, 'ACTIVO',
        ORA_HASH('1234', 4294967295) || ORA_HASH('admin.permisos', 4294967295),
-       'Permisos', 'BA', 0, '0', 1
-FROM USUARIOS
+       'BA', 0, '0', 1
+FROM USUARIOS_PERMISOS
 -- Si el script se vuelve a ejecutar, no duplica el usuario.
-HAVING NOT EXISTS (SELECT 1 FROM USUARIOS WHERE USUARIO = 'admin.permisos');
+HAVING NOT EXISTS (SELECT 1 FROM USUARIOS_PERMISOS WHERE USUARIO = 'admin.permisos');
 
 COMMIT;

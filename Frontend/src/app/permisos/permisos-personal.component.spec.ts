@@ -18,6 +18,12 @@ describe('Sección Personal', () => {
   const alerta = (): string => raiz().querySelector('[role="alert"]')?.textContent?.trim() ?? '';
   const filas = (): string[] => Array.from(raiz().querySelectorAll<HTMLTableRowElement>('tbody tr')).map((fila) => fila.cells[0].textContent!.trim());
 
+  const pagoDe = (nombre: string): HTMLInputElement => campo(raiz(), `input[aria-label="No. de pago de ${nombre}"]`);
+  async function tecla(elemento: HTMLElement, key: string): Promise<void> {
+    elemento.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }));
+    await actualizar(fixture);
+  }
+
   async function iniciar(datos: PermisoSesion, lista: PermisoEmpleado[] = empleados): Promise<void> {
     TestBed.configureTestingModule({
       imports: [PermisosPersonalComponent],
@@ -45,7 +51,7 @@ describe('Sección Personal', () => {
     beforeEach(async () => iniciar(sesion('JEFE'), [empleados[0], empleados[3]]));
 
     it('ve a su personal y solo puede agregar empleados sin área', async () => {
-      expect(texto()).toContain('ÁREA DE SOPORTE');
+      expect(texto()).toContain('Área de SOPORTE');
       expect(texto()).toContain('Mi personal · 1');
       expect(filas()).toEqual(['ANA LOPEZ']);
       expect(opcionesDe(campo(raiz(), '#personal-nuevo'))).toEqual(['Selecciona un empleado sin área', 'PEDRO SIN AREA']);
@@ -71,6 +77,17 @@ describe('Sección Personal', () => {
       await actualizar(fixture);
       expect(texto()).toContain('PEDRO SIN AREA se agregó a tu área.');
       expect(cambios).toBe(2);
+    });
+
+    it('el jefe también corrige el No. de pago de su personal con Enter', async () => {
+      expect(pagoDe('ANA LOPEZ').value).toBe('1001');
+      await escribir(fixture, pagoDe('ANA LOPEZ'), '1009');
+      await tecla(pagoDe('ANA LOPEZ'), 'Enter');
+      const guardar = llamada(http, 'PUT', '/permisos/personal/1/no-pago');
+      expect(guardar.request.body).toEqual({ NoPago: '1009' });
+      guardar.flush(null, { status: 204, statusText: 'No Content' });
+      await actualizar(fixture);
+      expect(texto()).toContain('No. de pago de ANA LOPEZ guardado: 1009.');
     });
 
     it('quitar del área: 404 y sin conexión muestran el motivo; luego lo quita', async () => {
@@ -145,6 +162,45 @@ describe('Sección Personal', () => {
       await actualizar(fixture);
       expect(texto()).toContain('LUIS PAZ quedó sin área.');
       expect(cambios).toBe(3);
+    });
+
+    it('el No. de pago se edita en la tabla: Enter lo guarda, Esc deshace y vacío lo borra', async () => {
+      expect(pagoDe('ANA LOPEZ').value).toBe('1001');
+      expect(pagoDe('PEDRO SIN AREA').value).toBe('');
+      expect(pagoDe('PEDRO SIN AREA').placeholder).toBe('Sin No. de pago');
+      expect(texto()).toContain('escríbelo en la tabla y presiona Enter');
+
+      // El mismo número (con espacios) no llama a la API; Esc vuelve al guardado.
+      await escribir(fixture, pagoDe('ANA LOPEZ'), ' 1001 ');
+      await tecla(pagoDe('ANA LOPEZ'), 'Enter');
+      sinLlamadas(http, 'PUT', '/permisos/personal/1/no-pago');
+      await escribir(fixture, pagoDe('ANA LOPEZ'), '5566');
+      await tecla(pagoDe('ANA LOPEZ'), 'Escape');
+      expect(pagoDe('ANA LOPEZ').value).toBe('1001');
+      sinLlamadas(http, 'PUT', '/permisos/personal/1/no-pago');
+
+      await escribir(fixture, pagoDe('ANA LOPEZ'), ' 5566 ');
+      await tecla(pagoDe('ANA LOPEZ'), 'Enter');
+      const guardar = llamada(http, 'PUT', '/permisos/personal/1/no-pago');
+      expect(guardar.request.body).toEqual({ NoPago: '5566' });
+      errorApi(guardar, 400, 'El No. de pago 5566 ya lo tiene LUIS PAZ.');
+      await actualizar(fixture);
+      expect(alerta()).toBe('El No. de pago 5566 ya lo tiene LUIS PAZ.');
+
+      await tecla(pagoDe('ANA LOPEZ'), 'Enter');
+      llamada(http, 'PUT', '/permisos/personal/1/no-pago').flush(null, { status: 204, statusText: 'No Content' });
+      await actualizar(fixture);
+      expect(texto()).toContain('No. de pago de ANA LOPEZ guardado: 5566.');
+      // Avisa al panel para recargar los empleados (y así el formulario del permiso toma el nuevo).
+      expect(cambios).toBe(2);
+
+      await escribir(fixture, pagoDe('LUIS PAZ'), '  ');
+      await tecla(pagoDe('LUIS PAZ'), 'Enter');
+      const borrar = llamada(http, 'PUT', '/permisos/personal/2/no-pago');
+      expect(borrar.request.body).toEqual({ NoPago: '' });
+      borrar.flush(null, { status: 204, statusText: 'No Content' });
+      await actualizar(fixture);
+      expect(texto()).toContain('LUIS PAZ quedó sin No. de pago.');
     });
 
     it('elegir el área que ya tiene no llama a la API', async () => {

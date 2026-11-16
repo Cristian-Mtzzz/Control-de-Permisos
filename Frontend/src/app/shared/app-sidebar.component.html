@@ -1,0 +1,34 @@
+<aside class="sidebar">
+  <div class="brand">
+    <!-- ?v= obliga al navegador a descargar el logo de nuevo cuando cambia. -->
+    <img src="logo.png?v=2" alt="IHSS · Instituto Hondureño de Seguridad Social" />
+    <span>Control de permisos</span>
+  </div>
+
+  <!-- Secciones: las define la pantalla según el nivel del usuario. -->
+  <nav class="sidebar-nav" aria-label="Secciones">
+    <ng-content />
+  </nav>
+
+  <div class="sidebar-footer">
+    @if (userName()) {
+    <div class="user" [attr.title]="userName()">
+      <span class="avatar" aria-hidden="true">{{ initials() }}</span>
+      <span class="user-text">
+        <strong>{{ userName() }}</strong>
+        <small>{{ roleLabel() }}</small>
+      </span>
+    </div>
+    }
+    <div class="footer-actions">
+      <button type="button" class="footer-button" (click)="refresh.emit()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.9-3.9M4 4v4h4M4 13a8 8 0 0 0 14.9 3.9M20 20v-4h-4" /></svg>
+        <span>Refrescar</span>
+      </button>
+      <button type="button" class="footer-button" (click)="logout.emit()">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h3a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2h-3M10 17l5-5-5-5M15 12H4" /></svg>
+        <span>Cerrar sesión</span>
+      </button>
+    </div>
+  </div>
+</aside>
